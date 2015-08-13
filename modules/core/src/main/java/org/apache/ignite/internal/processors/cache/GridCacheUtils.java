@@ -57,7 +57,6 @@ import static org.apache.ignite.cache.CacheMode.*;
 import static org.apache.ignite.cache.CacheRebalanceMode.*;
 import static org.apache.ignite.cache.CacheWriteSynchronizationMode.*;
 import static org.apache.ignite.internal.GridTopic.*;
-import static org.apache.ignite.internal.IgniteNodeAttributes.*;
 import static org.apache.ignite.internal.processors.cache.GridCacheOperation.*;
 
 /**
@@ -99,13 +98,6 @@ public class GridCacheUtils {
 
     /** Skip store flag bit mask. */
     public static final int SKIP_STORE_FLAG_MASK = 0x1;
-
-    /** Per-thread generated UID store. */
-    private static final ThreadLocal<UUID> UUIDS = new ThreadLocal<UUID>() {
-        @Override protected UUID initialValue() {
-            return UUID.randomUUID();
-        }
-    };
 
     /** Empty predicate array. */
     private static final IgnitePredicate[] EMPTY = new IgnitePredicate[0];
@@ -246,15 +238,6 @@ public class GridCacheUtils {
     }
 
     /**
-     * Gets per-thread-unique ID for this thread.
-     *
-     * @return ID for this thread.
-     */
-    public static UUID uuid() {
-        return UUIDS.get();
-    }
-
-    /**
      * @param msg Message to check.
      * @return {@code True} if preloader message.
      */
@@ -307,7 +290,7 @@ public class GridCacheUtils {
      * @param meta Meta name.
      * @return Filter for entries with meta.
      */
-    public static IgnitePredicate<KeyCacheObject> keyHasMeta(final GridCacheContext ctx, final UUID meta) {
+    public static IgnitePredicate<KeyCacheObject> keyHasMeta(final GridCacheContext ctx, final int meta) {
         return new P1<KeyCacheObject>() {
             @Override public boolean apply(KeyCacheObject k) {
                 GridCacheEntryEx e = ctx.cache().peekEx(k);
