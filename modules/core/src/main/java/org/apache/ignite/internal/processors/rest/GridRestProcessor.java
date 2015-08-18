@@ -218,8 +218,6 @@ public class GridRestProcessor extends GridProcessorAdapter {
 
                 GridRestResponse res = new GridRestResponse(STATUS_SECURITY_CHECK_FAILED, e.getMessage());
 
-                res.sessionTokenBytes(ZERO_BYTES);
-
                 return new GridFinishedFuture<>(res);
             }
             catch (IgniteCheckedException e) {
@@ -279,7 +277,7 @@ public class GridRestProcessor extends GridProcessorAdapter {
             if (F.isEmpty(sesTok) && clientId == null) {
                 Session ses = Session.random();
 
-                if (clientId2SesId.putIfAbsent(clientId, ses.sesId)!=null)
+                if (clientId2SesId.putIfAbsent(ses.clientId, ses.sesId) != null)
                     continue; /** New random clientId equals to existing clientId */
 
                 sesId2Ses.put(ses.sesId, ses);
@@ -293,7 +291,7 @@ public class GridRestProcessor extends GridProcessorAdapter {
                 if (sesId == null) {
                     Session ses = Session.fromClientId(clientId);
 
-                    if (clientId2SesId.putIfAbsent(ses.clientId, ses.sesId)!=null)
+                    if (clientId2SesId.putIfAbsent(ses.clientId, ses.sesId) != null)
                         continue; /** Another thread already register session with the clientId. */
 
                     sesId2Ses.put(ses.sesId, ses);
@@ -331,7 +329,7 @@ public class GridRestProcessor extends GridProcessorAdapter {
             if (!F.isEmpty(sesTok) && clientId != null) {
                 UUID sesId = clientId2SesId.get(clientId);
 
-                if (!sesId.equals(U.bytesToUuid(sesTok, 0)))
+                if (sesId == null || !sesId.equals(U.bytesToUuid(sesTok, 0)))
                     throw new IgniteCheckedException("Failed to handle request. " +
                         "Unsupported case (misamatched clientId and session token)");
 
@@ -362,7 +360,7 @@ public class GridRestProcessor extends GridProcessorAdapter {
         long sesExpTime0;
 
         try {
-            String sesExpTime = System.getProperty(IgniteSystemProperties.IGNITE_REST_SESSION_EXPIRE_TIME);
+            String sesExpTime = System.getProperty(IgniteSystemProperties.IGNITE_REST_SESSION_TIMEOUT);
 
             if (sesExpTime != null)
                 sesExpTime0 = Long.valueOf(sesExpTime) * 1000;
