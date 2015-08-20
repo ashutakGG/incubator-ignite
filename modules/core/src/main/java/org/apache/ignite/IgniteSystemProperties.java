@@ -97,7 +97,7 @@ public final class IgniteSystemProperties {
      */
     public static final String IGNITE_JETTY_LOG_NO_OVERRIDE = "IGNITE_JETTY_LOG_NO_OVERRIDE";
 
-    /** This property allow to rewrite default ({@code 30}) rest session expire time (in seconds). */
+    /** This property allow rewriting default ({@code 30}) rest session expire time (in seconds). */
     public static final String IGNITE_REST_SESSION_TIMEOUT = "IGNITE_REST_SESSION_TIMEOUT";
 
     /**
