@@ -201,7 +201,7 @@ public class GridRestProcessor extends GridProcessorAdapter {
             assert ses != null;
 
             req.clientId(ses.clientId);
-            req.sessionToken(ses.sesTok());
+            req.sessionToken(U.uuidToBytes(ses.sesId));
 
             if (log.isDebugEnabled())
                 log.debug("Next clientId and sessionToken were extracted according to request: " +
@@ -861,28 +861,42 @@ public class GridRestProcessor extends GridProcessorAdapter {
          */
         private final AtomicLong lastTouchTime = new AtomicLong(U.currentTimeMillis());
 
+        /**
+         * @param clientId Client ID.
+         * @param sesId session ID.
+         */
         private Session(UUID clientId, UUID sesId) {
             this.clientId = clientId;
             this.sesId = sesId;
         }
 
+        /**
+         * Static constructor.
+         *
+         * @return New session instance with random client ID and random session ID.
+         */
         static Session random() {
             return new Session(UUID.randomUUID(), UUID.randomUUID());
         }
 
+        /**
+         * Static constructor.
+         *
+         * @param clientId Client ID.
+         * @return New session instance with given client ID and random session ID.
+         */
         static Session fromClientId(UUID clientId) {
             return new Session(clientId, UUID.randomUUID());
         }
 
+        /**
+         * Static constructor.
+         *
+         * @param sesTokId Session token ID.
+         * @return New session instance with random client ID and given session ID.
+         */
         static Session fromSessionToken(UUID sesTokId) {
             return new Session(UUID.randomUUID(), sesTokId);
-        }
-
-        /**
-         * @return Session token as bytes.
-         */
-        byte[] sesTok(){
-            return U.uuidToBytes(sesId);
         }
 
         /**
@@ -890,6 +904,7 @@ public class GridRestProcessor extends GridProcessorAdapter {
          *
          * @param sesTimeout Session timeout.
          * @return <code>True</code> if expired.
+         * @see #checkTimeoutAndTryUpdateLastTouchTime()
          */
         boolean checkTimeout(long sesTimeout) {
             long time0 = lastTouchTime.get();
@@ -904,6 +919,7 @@ public class GridRestProcessor extends GridProcessorAdapter {
          * Checks whether session at expired state (EPIRATION_FLAG) or not, if not then tries to update last touch time.
          *
          * @return <code>True</code> if timed out.
+         * @see #checkTimeout(long)
          */
         boolean checkTimeoutAndTryUpdateLastTouchTime() {
             while (true) {
