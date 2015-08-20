@@ -59,9 +59,6 @@ public class GridRestProcessor extends GridProcessorAdapter {
     private static final String HTTP_PROTO_CLS =
         "org.apache.ignite.internal.processors.rest.protocols.http.jetty.GridJettyRestProtocol";
 
-    /** */
-    public static final byte[] ZERO_BYTES = new byte[0];
-
     /** Delay between sessions timeout checks*/
     private static final int SES_TIMEOUT_CHECK_DELAY = 1_000;
 
