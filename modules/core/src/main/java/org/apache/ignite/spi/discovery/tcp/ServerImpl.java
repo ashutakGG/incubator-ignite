@@ -114,7 +114,7 @@ class ServerImpl extends TcpDiscoveryImpl {
     protected TcpDiscoverySpiState spiState = DISCONNECTED;
 
     /** Map with proceeding ping requests. */
-    private final ConcurrentMap<InetSocketAddress, IgniteInternalFuture<IgniteBiTuple<UUID, Boolean>>> pingMap =
+    private final ConcurrentMap<InetSocketAddress, GridPingFutureAdapter<IgniteBiTuple<UUID, Boolean>>> pingMap =
         new ConcurrentHashMap8<>();
 
     /**
@@ -388,12 +388,15 @@ class ServerImpl extends TcpDiscoveryImpl {
 
         TcpDiscoveryNode node = ring.node(nodeId);
 
-        if (node == null || !node.visible())
+        if (node == null)
+            return false;
+
+        if (!nodeAlive(nodeId))
             return false;
 
         boolean res = pingNode(node);
 
-        if (!res && !node.isClient()) {
+        if (!res && !node.isClient() && nodeAlive(nodeId)) {
             LT.warn(log, null, "Failed to ping node (status check will be initiated): " + nodeId);
 
             msgWorker.addMessage(new TcpDiscoveryStatusCheckMessage(locNode, node.id()));
@@ -421,14 +424,18 @@ class ServerImpl extends TcpDiscoveryImpl {
 
             node = ring.node(node.clientRouterNodeId());
 
-            if (node == null || !node.visible())
+            if (node == null || !nodeAlive(node.id()))
                 return false;
         }
 
         for (InetSocketAddress addr : spi.getNodeAddresses(node, U.sameMacs(locNode, node))) {
             try {
                 // ID returned by the node should be the same as ID of the parameter for ping to succeed.
-                IgniteBiTuple<UUID, Boolean> t = pingNode(addr, clientNodeId);
+                IgniteBiTuple<UUID, Boolean> t = pingNode(addr, node.id(), clientNodeId);
+
+                if (t == null)
+                    // Remote node left topology.
+                    return false;
 
                 boolean res = node.id().equals(t.get1()) && (clientNodeId == null || t.get2());
 
@@ -453,12 +460,14 @@ class ServerImpl extends TcpDiscoveryImpl {
      * Pings the node by its address to see if it's alive.
      *
      * @param addr Address of the node.
+     * @param nodeId Node ID to ping. In case when client node ID is not null this node ID is an ID of the router node.
      * @param clientNodeId Client node ID.
-     * @return ID of the remote node and "client exists" flag if node alive.
+     * @return ID of the remote node and "client exists" flag if node alive or {@code null} if the remote node has
+     *         left a topology during the ping process.
      * @throws IgniteCheckedException If an error occurs.
      */
-    private IgniteBiTuple<UUID, Boolean> pingNode(InetSocketAddress addr, @Nullable UUID clientNodeId)
-        throws IgniteCheckedException {
+    private @Nullable IgniteBiTuple<UUID, Boolean> pingNode(InetSocketAddress addr, @Nullable UUID nodeId,
+        @Nullable UUID clientNodeId) throws IgniteCheckedException {
         assert addr != null;
 
         UUID locNodeId = getLocalNodeId();
@@ -488,9 +497,9 @@ class ServerImpl extends TcpDiscoveryImpl {
             return F.t(getLocalNodeId(), clientPingRes);
         }
 
-        GridFutureAdapter<IgniteBiTuple<UUID, Boolean>> fut = new GridFutureAdapter<>();
+        GridPingFutureAdapter<IgniteBiTuple<UUID, Boolean>> fut = new GridPingFutureAdapter<>();
 
-        IgniteInternalFuture<IgniteBiTuple<UUID, Boolean>> oldFut = pingMap.putIfAbsent(addr, fut);
+        GridPingFutureAdapter<IgniteBiTuple<UUID, Boolean>> oldFut = pingMap.putIfAbsent(addr, fut);
 
         if (oldFut != null)
             return oldFut.get();
@@ -511,7 +520,11 @@ class ServerImpl extends TcpDiscoveryImpl {
 
                         long tstamp = U.currentTimeMillis();
 
-                        sock = spi.openSocket(addr, timeoutHelper);
+                        sock = spi.createSocket();
+
+                        fut.sock = sock;
+
+                        sock = spi.openSocket(sock, addr, timeoutHelper);
 
                         openedSock = true;
 
@@ -537,6 +550,16 @@ class ServerImpl extends TcpDiscoveryImpl {
                         return t;
                     }
                     catch (IOException | IgniteCheckedException e) {
+                        if (nodeId != null && !nodeAlive(nodeId)) {
+                            if (log.isDebugEnabled())
+                                log.debug("Failed to ping the node (has left or leaving topology): [nodeId=" + nodeId +
+                                    ']');
+
+                            fut.onDone((IgniteBiTuple<UUID, Boolean>)null);
+
+                            return null;
+                        }
+
                         if (errs == null)
                             errs = new ArrayList<>();
 
@@ -578,6 +601,21 @@ class ServerImpl extends TcpDiscoveryImpl {
         }
     }
 
+    /**
+     * Interrupts all existed 'ping' request for the given node.
+     *
+     * @param node Node that may be pinged.
+     */
+    private void interruptPing(TcpDiscoveryNode node) {
+        for (InetSocketAddress addr : spi.getNodeAddresses(node)) {
+            GridPingFutureAdapter fut = pingMap.get(addr);
+
+            if (fut != null && fut.sock != null)
+                // Reference to the socket is not set to null. No need to assign it to a local variable.
+                U.closeQuiet(fut.sock);
+        }
+    }
+
     /** {@inheritDoc} */
     @Override public void disconnect() throws IgniteSpiException {
         spiStop0(true);
@@ -609,9 +647,31 @@ class ServerImpl extends TcpDiscoveryImpl {
     }
 
     /** {@inheritDoc} */
-    @Override protected void onDataReceived() {
+    @Override protected void onMessageExchanged() {
         if (spi.failureDetectionTimeoutEnabled() && locNode != null)
-            locNode.lastDataReceivedTime(U.currentTimeMillis());
+            locNode.lastExchangeTime(U.currentTimeMillis());
+    }
+
+    /**
+     * Checks whether a node is alive or not.
+     *
+     * @param nodeId Node ID.
+     * @return {@code True} if node is in the ring and is not being removed from.
+     */
+    private boolean nodeAlive(UUID nodeId) {
+        // Is node alive or about to be removed from the ring?
+        TcpDiscoveryNode node = ring.node(nodeId);
+
+        boolean nodeAlive = node != null && node.visible();
+
+        if (nodeAlive) {
+            synchronized (mux) {
+                nodeAlive = !F.transform(failedNodes, F.node2id()).contains(nodeId) &&
+                    !F.transform(leavingNodes, F.node2id()).contains(nodeId);
+            }
+        }
+
+        return nodeAlive;
     }
 
     /**
@@ -1520,7 +1580,7 @@ class ServerImpl extends TcpDiscoveryImpl {
 
                         if (res == null) {
                             try {
-                                res = pingNode(addr, null).get1() != null;
+                                res = pingNode(addr, null, null).get1() != null;
                             }
                             catch (IgniteCheckedException e) {
                                 if (log.isDebugEnabled())
@@ -1875,9 +1935,13 @@ class ServerImpl extends TcpDiscoveryImpl {
             if (spi.ensured(msg))
                 msgHist.add(msg);
 
-            if (msg.senderNodeId() != null && !msg.senderNodeId().equals(getLocalNodeId()))
-                // Reset the flag.
+            if (msg.senderNodeId() != null && !msg.senderNodeId().equals(getLocalNodeId())) {
+                // Received a message from remote node.
+                onMessageExchanged();
+
+                // Reset the failure flag.
                 failureThresholdReached = false;
+            }
 
             spi.stats.onMessageProcessingFinished(msg);
         }
@@ -2236,6 +2300,8 @@ class ServerImpl extends TcpDiscoveryImpl {
                                 spi.stats.onMessageSent(msg, U.currentTimeMillis() - tstamp);
 
                                 int res = spi.readReceipt(sock, timeoutHelper.nextTimeoutChunk(ackTimeout0));
+
+                                onMessageExchanged();
 
                                 if (log.isDebugEnabled())
                                     log.debug("Message has been sent to next node [msg=" + msg +
@@ -3325,6 +3391,8 @@ class ServerImpl extends TcpDiscoveryImpl {
             if (msg.verified() && !locNodeId.equals(leavingNodeId)) {
                 TcpDiscoveryNode leftNode = ring.removeNode(leavingNodeId);
 
+                interruptPing(leavingNode);
+
                 assert leftNode != null;
 
                 if (log.isDebugEnabled())
@@ -3491,6 +3559,8 @@ class ServerImpl extends TcpDiscoveryImpl {
 
             if (msg.verified()) {
                 node = ring.removeNode(nodeId);
+
+                interruptPing(node);
 
                 assert node != null;
 
@@ -3775,9 +3845,17 @@ class ServerImpl extends TcpDiscoveryImpl {
                             else {
                                 int aliveCheck = clientNode.decrementAliveCheck();
 
-                                if (aliveCheck <= 0 && isLocalNodeCoordinator() && !failedNodes.contains(clientNode))
-                                    processNodeFailedMessage(new TcpDiscoveryNodeFailedMessage(locNodeId,
-                                        clientNode.id(), clientNode.internalOrder()));
+                                if (aliveCheck <= 0 && isLocalNodeCoordinator()) {
+                                    boolean failedNode;
+
+                                    synchronized (mux) {
+                                        failedNode = failedNodes.contains(clientNode);
+                                    }
+
+                                    if (!failedNode)
+                                        processNodeFailedMessage(new TcpDiscoveryNodeFailedMessage(locNodeId,
+                                            clientNode.id(), clientNode.internalOrder()));
+                                }
                             }
                         }
                     }
@@ -4055,12 +4133,15 @@ class ServerImpl extends TcpDiscoveryImpl {
          * Check connection aliveness status.
          */
         private void checkConnection() {
+            Boolean hasRemoteSrvNodes = null;
+
             if (spi.failureDetectionTimeoutEnabled() && !failureThresholdReached &&
-                U.currentTimeMillis() - locNode.lastDataReceivedTime() >= connCheckThreshold &&
-                ring.hasRemoteNodes() && spiStateCopy() == CONNECTED) {
+                U.currentTimeMillis() - locNode.lastExchangeTime() >= connCheckThreshold &&
+                spiStateCopy() == CONNECTED &&
+                (hasRemoteSrvNodes = ring.hasRemoteServerNodes())) {
 
                 log.info("Local node seems to be disconnected from topology (failure detection timeout " +
-                    "is reached): [failureDetectionTimeout=" + spi.failureDetectionTimeout() +
+                    "is reached) [failureDetectionTimeout=" + spi.failureDetectionTimeout() +
                     ", connCheckFreq=" + connCheckFreq + ']');
 
                 failureThresholdReached = true;
@@ -4074,7 +4155,10 @@ class ServerImpl extends TcpDiscoveryImpl {
             if (elapsed > 0)
                 return;
 
-            if (ring.hasRemoteNodes()) {
+            if (hasRemoteSrvNodes == null)
+                hasRemoteSrvNodes = ring.hasRemoteServerNodes();
+
+            if (hasRemoteSrvNodes) {
                 sendMessageAcrossRing(new TcpDiscoveryConnectionCheckMessage(locNode));
 
                 lastTimeConnCheckMsgSent = U.currentTimeMillis();
@@ -4689,26 +4773,6 @@ class ServerImpl extends TcpDiscoveryImpl {
         }
 
         /**
-         * @param nodeId Node ID.
-         * @return {@code True} if node is in the ring and is not being removed from.
-         */
-        private boolean nodeAlive(UUID nodeId) {
-            // Is node alive or about to be removed from the ring?
-            TcpDiscoveryNode node = ring.node(nodeId);
-
-            boolean nodeAlive = node != null && node.visible();
-
-            if (nodeAlive) {
-                synchronized (mux) {
-                    nodeAlive = !F.transform(failedNodes, F.node2id()).contains(nodeId) &&
-                        !F.transform(leavingNodes, F.node2id()).contains(nodeId);
-                }
-            }
-
-            return nodeAlive;
-        }
-
-        /**
          * @param msg Join request message.
          * @param clientMsgWrk Client message worker to start.
          * @return Whether connection was successful.
@@ -5111,6 +5175,32 @@ class ServerImpl extends TcpDiscoveryImpl {
             bout.reset();
 
             spi.writeToSocket(sock, msg, bout, timeout);
+        }
+    }
+
+    /**
+     *
+     */
+    private static class GridPingFutureAdapter<R> extends GridFutureAdapter<R> {
+        /** Socket. */
+        private volatile Socket sock;
+
+        /**
+         * Returns socket associated with this ping future.
+         *
+         * @return Socket or {@code null} if no socket associated.
+         */
+        public Socket sock() {
+            return sock;
+        }
+
+        /**
+         * Associates socket with this ping future.
+         *
+         * @param sock Socket.
+         */
+        public void sock(Socket sock) {
+            this.sock = sock;
         }
     }
 }
