@@ -86,9 +86,6 @@ class GridUpdateNotifier {
     /** */
     private long lastLog = -1;
 
-    /** */
-    private final ExecutorService execSrvc = Executors.newSingleThreadExecutor();
-
     /**
      * Creates new notifier with default values.
      *
@@ -183,15 +180,16 @@ class GridUpdateNotifier {
     /**
      * Starts asynchronous process for retrieving latest version data.
      *
+     * @param exec Executor service.
      * @param log Logger.
      */
-    void checkForNewVersion(IgniteLogger log) {
+    void checkForNewVersion(Executor exec, IgniteLogger log) {
         assert log != null;
 
         log = log.getLogger(getClass());
 
         try {
-            execSrvc.execute(checker = new UpdateChecker(log));
+            exec.execute(checker = new UpdateChecker(log));
         }
         catch (RejectedExecutionException e) {
             U.error(log, "Failed to schedule a thread due to execution rejection (safely ignoring): " +
@@ -211,7 +209,7 @@ class GridUpdateNotifier {
 
         // Don't join it to avoid any delays on update checker.
         // Checker thread will eventually exit.
-        checker.cancelConnection();
+        U.cancel(checker);
 
         String latestVer = this.latestVer;
         String downloadUrl = this.downloadUrl;
@@ -261,9 +259,7 @@ class GridUpdateNotifier {
      */
     public void stop() {
         if (checker != null)
-            checker.cancelConnection();
-
-        execSrvc.shutdownNow();
+            U.cancel(checker);
     }
 
     /**
@@ -322,6 +318,12 @@ class GridUpdateNotifier {
 
                     try {
                         this.conn = conn;
+
+                        if (isCancelled()) {
+                            U.closeQuiet(conn);
+
+                            return;
+                        }
 
                         try (OutputStream os = conn.getOutputStream()) {
                             os.write(postParams.getBytes(CHARSET));
@@ -419,11 +421,11 @@ class GridUpdateNotifier {
             return obtainMeta("downloadUrl", node);
         }
 
-        /**
-         * Cancels connection.
-         */
-        void cancelConnection() {
+        /** {@inheritDoc} */
+        @Override public void cancel() {
             U.closeQuiet(conn);
+
+            super.cancel();
         }
     }
 }

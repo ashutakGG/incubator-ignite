@@ -700,7 +700,7 @@ public class IgniteKernal implements IgniteEx, IgniteMXBean, Externalizable {
                             if (!first)
                                 verChecker.topologySize(cluster().nodes().size());
 
-                            verChecker.checkForNewVersion(log);
+                            verChecker.checkForNewVersion(execSvc, log);
 
                             // Just wait for 10 secs.
                             Thread.sleep(PERIODIC_VER_CHECK_CONN_TIMEOUT);
@@ -1795,10 +1795,6 @@ public class IgniteKernal implements IgniteEx, IgniteMXBean, Externalizable {
                     unregisterMBean(restExecSvcMBean)
             ))
                 errOnStop = false;
-
-            boolean notifyEnabled = IgniteSystemProperties.getBoolean(IGNITE_UPDATE_NOTIFIER, true);
-
-//            if (notifyEnabled)...
 
             // Stop components in reverse order.
             for (ListIterator<GridComponent> it = comps.listIterator(comps.size()); it.hasPrevious();) {
