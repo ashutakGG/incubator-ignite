@@ -67,23 +67,15 @@ public class GridUpdateNotifierSelfTest extends GridCommonAbstractTest {
     /**
      * @throws Exception If failed.
      */
-    @SuppressWarnings("BusyWait")
     public void testNotifier() throws Exception {
         String nodeVer = IgniteProperties.get("ignite.version");
 
         GridUpdateNotifier ntf = new GridUpdateNotifier(null, nodeVer,
             TEST_GATEWAY, Collections.<PluginProvider>emptyList(), false);
 
-        ntf.checkForNewVersion(log);
+        ntf.checkForNewVersion(new SelfExecutor(), log);
 
         String ver = ntf.latestVersion();
-
-        // Wait 60 sec for response.
-        for (int i = 0; ver == null && i < 600; i++) {
-            Thread.sleep(100);
-
-            ver = ntf.latestVersion();
-        }
 
         info("Latest version: " + ver);
 
