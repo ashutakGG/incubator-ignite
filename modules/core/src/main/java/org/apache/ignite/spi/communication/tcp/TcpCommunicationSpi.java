@@ -149,7 +149,7 @@ import static org.apache.ignite.events.EventType.*;
  * &lt;/bean&gt;
  * </pre>
  * <p>
- * <img src="http://ignite.incubator.apache.org/images/spring-small.png">
+ * <img src="http://ignite.apache.org/images/spring-small.png">
  * <br>
  * For information about Spring framework visit <a href="http://www.springframework.org/">www.springframework.org</a>
  * @see CommunicationSpi
@@ -1510,13 +1510,13 @@ public class TcpCommunicationSpi extends IgniteSpiAdapter
                         return impl.writer();
                     }
 
-                    @Override public MessageReader reader(MessageFactory factory) {
+                    @Override public MessageReader reader(MessageFactory factory, Class<? extends Message> msgCls) {
                         if (impl == null)
                             impl = getSpiContext().messageFormatter();
 
                         assert impl != null;
 
-                        return impl.reader(factory);
+                        return impl.reader(factory, msgCls);
                     }
                 };
 
@@ -2845,13 +2845,13 @@ public class TcpCommunicationSpi extends IgniteSpiAdapter
                         return impl.writer();
                     }
 
-                    @Override public MessageReader reader(MessageFactory factory) {
+                    @Override public MessageReader reader(MessageFactory factory, Class<? extends Message> msgCls) {
                         if (impl == null)
                             impl = getSpiContext().messageFormatter();
 
                         assert impl != null;
 
-                        return impl.reader(factory);
+                        return impl.reader(factory, msgCls);
                     }
                 };
 
