@@ -54,8 +54,8 @@ public class Migration6_7 {
      */
     public static void main(String[] args) throws Exception {
         try(
-            GridClient grGainClient1 = GridClientFactory.start(gg6ClientConfiguration(0));
-            GridClient grGainClient2 = GridClientFactory.start(gg6ClientConfiguration(1));
+            GridClient grGainClient1 = GridClientFactory.start(gg6ClientConfiguration());
+            GridClient grGainClient2 = GridClientFactory.start(gg6ClientConfiguration());
             Ignite igniteClient1 = Ignition.start(igniteClientConfiguration(1));
             Ignite igniteClient2 = Ignition.start(igniteClientConfiguration(2))
         ) {
@@ -134,10 +134,10 @@ public class Migration6_7 {
     /**
      * @param i I.
      */
-    private static GridClientConfiguration gg6ClientConfiguration(int i) {
+    private static GridClientConfiguration gg6ClientConfiguration() {
         GridClientConfiguration c = new GridClientConfiguration();
 
-        c.setServers(Collections.singleton("127.0.0.1:" + (11211+i)));
+        c.setServers(Collections.singleton("127.0.0.1:11211"));
 
         // Data 1.
         Collection<GridClientDataConfiguration> dataCfgs = new ArrayList<>();
