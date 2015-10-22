@@ -41,46 +41,59 @@ import org.apache.ignite.resources.CacheStoreSessionResource;
 import org.apache.ignite.resources.LoggerResource;
 
 /**
- * ${@link org.apache.ignite.cache.store.CacheStore} implementation to store Ignite cache key/value into Cassandra database
- * @param <K> Ignite cache key type
- * @param <V> Ignite cache value type
+ * ${@link org.apache.ignite.cache.store.CacheStore} implementation to store Ignite cache key/value into Cassandra
+ * database.
+ *
+ * @param <K> Ignite cache key type.
+ * @param <V> Ignite cache value type.
  */
 public class CassandraCacheStore<K, V> implements CacheStore<K, V> {
+    /** Attr connection property. */
     private static final String ATTR_CONN_PROP = "CASSANDRA_STORE_CONNECTION";
 
     /** Auto-injected store session. */
     @CacheStoreSessionResource
-    private CacheStoreSession storeSession;
+    private CacheStoreSession storeSes;
 
     /** Auto-injected logger instance. */
     @LoggerResource
     private IgniteLogger logger;
 
-    private DataSource dataSource;
+    /** Data source. */
+    private DataSource dataSrc;
+
+    /** Controller. */
     private PersistenceController controller;
 
-    public CassandraCacheStore(DataSource dataSource, KeyValuePersistenceSettings settings) {
-        this.dataSource = dataSource;
+    /**
+     * @param dataSrc Data source.
+     * @param settings Settings.
+     */
+    public CassandraCacheStore(DataSource dataSrc, KeyValuePersistenceSettings settings) {
+        this.dataSrc = dataSrc;
         this.controller = new PersistenceController(settings);
     }
 
-    @Override public void loadCache(IgniteBiInClosure<K, V> closure, Object... args) throws CacheLoaderException {
+    /** {@inheritDoc} */
+    @Override public void loadCache(IgniteBiInClosure<K, V> c, Object... args) throws CacheLoaderException {
     }
 
+    /** {@inheritDoc} */
     @Override public void sessionEnd(boolean commit) throws CacheWriterException {
-        if (storeSession == null || storeSession.transaction() == null)
+        if (storeSes == null || storeSes.transaction() == null)
             return;
 
-        CassandraSession cassandraSession = (CassandraSession)storeSession.properties().remove(ATTR_CONN_PROP);
-        if (cassandraSession != null) {
+        CassandraSession cassandraSes = (CassandraSession)storeSes.properties().remove(ATTR_CONN_PROP);
+        if (cassandraSes != null) {
             try {
-                cassandraSession.close();
+                cassandraSes.close();
             }
             catch (Throwable ignored) {
             }
         }
     }
 
+    /** {@inheritDoc} */
     @SuppressWarnings({"unchecked"})
     @Override public V load(final K key) throws CacheLoaderException {
         if (key == null)
@@ -120,6 +133,7 @@ public class CassandraCacheStore<K, V> implements CacheStore<K, V> {
         }
     }
 
+    /** {@inheritDoc} */
     @SuppressWarnings("unchecked")
     @Override public Map<K, V> loadAll(Iterable<? extends K> keys) throws CacheLoaderException {
         if (keys == null || !keys.iterator().hasNext())
@@ -135,7 +149,7 @@ public class CassandraCacheStore<K, V> implements CacheStore<K, V> {
                     return controller.getLoadStatement(true);
                 }
 
-                @Override  public BoundStatement bindStatement(PreparedStatement statement, K key) {
+                @Override public BoundStatement bindStatement(PreparedStatement statement, K key) {
                     return controller.bindKey(statement, key);
                 }
 
@@ -161,6 +175,7 @@ public class CassandraCacheStore<K, V> implements CacheStore<K, V> {
         }
     }
 
+    /** {@inheritDoc} */
     @Override public void write(final Cache.Entry<? extends K, ? extends V> entry) throws CacheWriterException {
         if (entry == null || entry.getKey() == null)
             return;
@@ -199,6 +214,7 @@ public class CassandraCacheStore<K, V> implements CacheStore<K, V> {
         }
     }
 
+    /** {@inheritDoc} */
     @Override public void writeAll(Collection<Cache.Entry<? extends K, ? extends V>> entries) throws CacheWriterException {
         if (entries == null || entries.isEmpty())
             return;
@@ -234,6 +250,7 @@ public class CassandraCacheStore<K, V> implements CacheStore<K, V> {
         }
     }
 
+    /** {@inheritDoc} */
     @Override public void delete(final Object key) throws CacheWriterException {
         if (key == null)
             return;
@@ -254,7 +271,6 @@ public class CassandraCacheStore<K, V> implements CacheStore<K, V> {
                     return controller.bindKey(statement, key);
                 }
 
-
                 @Override public KeyValuePersistenceSettings getPersistenceSettings() {
                     return controller.getPersistenceSettings();
                 }
@@ -273,6 +289,7 @@ public class CassandraCacheStore<K, V> implements CacheStore<K, V> {
         }
     }
 
+    /** {@inheritDoc} */
     @Override public void deleteAll(Collection<?> keys) throws CacheWriterException {
         if (keys == null || keys.isEmpty())
             return;
@@ -303,22 +320,28 @@ public class CassandraCacheStore<K, V> implements CacheStore<K, V> {
         }
     }
 
+    /**
+     *
+     */
     private CassandraSession getCassandraSession() {
-        if (storeSession == null || storeSession.transaction() == null)
-            return dataSource.session(logger != null ? logger : new NullLogger());
+        if (storeSes == null || storeSes.transaction() == null)
+            return dataSrc.session(logger != null ? logger : new NullLogger());
 
-        CassandraSession ses = (CassandraSession)storeSession.properties().get(ATTR_CONN_PROP);
+        CassandraSession ses = (CassandraSession)storeSes.properties().get(ATTR_CONN_PROP);
 
         if (ses == null) {
-            ses = dataSource.session(logger != null ? logger : new NullLogger());
-            storeSession.properties().put(ATTR_CONN_PROP, ses);
+            ses = dataSrc.session(logger != null ? logger : new NullLogger());
+            storeSes.properties().put(ATTR_CONN_PROP, ses);
         }
 
         return ses;
     }
 
+    /**
+     * @param ses Session.
+     */
     private void closeCassandraSession(CassandraSession ses) {
-        if (ses != null && (storeSession == null || storeSession.transaction() == null)) {
+        if (ses != null && (storeSes == null || storeSes.transaction() == null)) {
             try {
                 ses.close();
             }
