@@ -37,7 +37,7 @@ public class GridCachePartitionedAtomicSequenceMultiThreadedTest extends IgniteA
     private static final int THREAD_NUM = 30;
 
     /** Number of iterations per thread for multithreaded test. */
-    private static final int ITERATION_NUM = 4000;
+    private static final int ITERATION_NUM = 10000;
 
     /** {@inheritDoc} */
     @Override protected CacheMode atomicsCacheMode() {
@@ -151,13 +151,45 @@ public class GridCachePartitionedAtomicSequenceMultiThreadedTest extends IgniteA
 
         final IgniteAtomicSequence seq = grid(0).atomicSequence(seqName, 0L, true);
 
+        // Warm up.
+        log.info(">>>>> Warm up");
+
         runSequenceClosure(new GridInUnsafeClosure<IgniteAtomicSequence>() {
             @Override public void apply(IgniteAtomicSequence t) {
                 t.incrementAndGet();
             }
-        }, seq, ITERATION_NUM, THREAD_NUM);
+        }, seq, ITERATION_NUM * 3, THREAD_NUM);
 
-        assertEquals(ITERATION_NUM * THREAD_NUM, seq.get());
+        log.info(">>>>> Warm up finished.");
+
+        long[] res = new long[20];
+
+        for (int i = 0; i < res.length; i++) {
+            long start = U.currentTimeMillis();
+
+            runSequenceClosure(new GridInUnsafeClosure<IgniteAtomicSequence>() {
+                @Override public void apply(IgniteAtomicSequence t) {
+                    t.incrementAndGet();
+                }
+            }, seq, ITERATION_NUM, THREAD_NUM);
+
+            long duration = U.currentTimeMillis() - start;
+
+            log.info(">>>>> Duration = " + duration);
+
+            res[i] = duration;
+        }
+
+        long avgDuration = 0;
+
+        for (long duration : res)
+            avgDuration += duration;
+
+        avgDuration /= res.length;
+
+        log.info(">>>>> Average Duration = " + avgDuration);
+
+//        assertEquals(ITERATION_NUM * THREAD_NUM, seq.get());
     }
 
     /** @throws Exception If failed. */
