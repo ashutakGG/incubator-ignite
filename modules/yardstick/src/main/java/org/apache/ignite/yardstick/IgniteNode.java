@@ -77,56 +77,58 @@ public class IgniteNode implements BenchmarkServer {
 
         assert c != null;
 
-        for (CacheConfiguration cc : c.getCacheConfiguration()) {
-            // IgniteNode can not run in CLIENT_ONLY mode,
-            // except the case when it's used inside IgniteAbstractBenchmark.
-            boolean cl = args.isClientOnly() && !args.isNearCache() && !clientMode ?
-                false : args.isClientOnly();
+        if (c.getCacheConfiguration() != null) {
+            for (CacheConfiguration cc : c.getCacheConfiguration()) {
+                // IgniteNode can not run in CLIENT_ONLY mode,
+                // except the case when it's used inside IgniteAbstractBenchmark.
+                boolean cl = args.isClientOnly() && !args.isNearCache() && !clientMode ?
+                    false : args.isClientOnly();
 
-            if (cl)
-                c.setClientMode(true);
+                if (cl)
+                    c.setClientMode(true);
 
-            if (args.isNearCache()) {
-                NearCacheConfiguration nearCfg = new NearCacheConfiguration();
+                if (args.isNearCache()) {
+                    NearCacheConfiguration nearCfg = new NearCacheConfiguration();
 
-                if (args.getNearCacheSize() != 0)
-                    nearCfg.setNearEvictionPolicy(new LruEvictionPolicy(args.getNearCacheSize()));
+                    if (args.getNearCacheSize() != 0)
+                        nearCfg.setNearEvictionPolicy(new LruEvictionPolicy(args.getNearCacheSize()));
 
-                cc.setNearConfiguration(nearCfg);
+                    cc.setNearConfiguration(nearCfg);
+                }
+
+                cc.setWriteSynchronizationMode(args.syncMode());
+
+                if (args.orderMode() != null)
+                    cc.setAtomicWriteOrderMode(args.orderMode());
+
+                cc.setBackups(args.backups());
+
+                if (args.restTcpPort() != 0) {
+                    ConnectorConfiguration ccc = new ConnectorConfiguration();
+
+                    ccc.setPort(args.restTcpPort());
+
+                    if (args.restTcpHost() != null)
+                        ccc.setHost(args.restTcpHost());
+
+                    c.setConnectorConfiguration(ccc);
+                }
+
+                if (args.isOffHeap()) {
+                    cc.setOffHeapMaxMemory(0);
+
+                    if (args.isOffheapValues())
+                        cc.setMemoryMode(OFFHEAP_VALUES);
+                    else
+                        cc.setEvictionPolicy(new LruEvictionPolicy(50000));
+                }
+
+                cc.setReadThrough(args.isStoreEnabled());
+
+                cc.setWriteThrough(args.isStoreEnabled());
+
+                cc.setWriteBehindEnabled(args.isWriteBehind());
             }
-
-            cc.setWriteSynchronizationMode(args.syncMode());
-
-            if (args.orderMode() != null)
-                cc.setAtomicWriteOrderMode(args.orderMode());
-
-            cc.setBackups(args.backups());
-
-            if (args.restTcpPort() != 0) {
-                ConnectorConfiguration ccc = new ConnectorConfiguration();
-
-                ccc.setPort(args.restTcpPort());
-
-                if (args.restTcpHost() != null)
-                    ccc.setHost(args.restTcpHost());
-
-                c.setConnectorConfiguration(ccc);
-            }
-
-            if (args.isOffHeap()) {
-                cc.setOffHeapMaxMemory(0);
-
-                if (args.isOffheapValues())
-                    cc.setMemoryMode(OFFHEAP_VALUES);
-                else
-                    cc.setEvictionPolicy(new LruEvictionPolicy(50000));
-            }
-
-            cc.setReadThrough(args.isStoreEnabled());
-
-            cc.setWriteThrough(args.isStoreEnabled());
-
-            cc.setWriteBehindEnabled(args.isWriteBehind());
         }
 
         TransactionConfiguration tc = c.getTransactionConfiguration();
