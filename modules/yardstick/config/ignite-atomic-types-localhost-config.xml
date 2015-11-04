@@ -24,7 +24,7 @@
        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
        xsi:schemaLocation="
         http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-2.5.xsd">
-    <import resource="ignite-atomics-base-config.xml"/>
+    <import resource="ignite-atomic-types-base-config.xml"/>
 
     <bean id="grid.cfg" class="org.apache.ignite.configuration.IgniteConfiguration" parent="base-ignite.cfg">
         <property name="localHost" value="127.0.0.1"/>
