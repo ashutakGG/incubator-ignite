@@ -135,6 +135,42 @@ public class GridCachePartitionedAtomicSequenceMultiThreadedTest extends IgniteA
     }
 
     /** @throws Exception If failed. */
+    public void testValues2Nodes() throws Exception {
+        String seqName = UUID.randomUUID().toString();
+
+        startGrid(1);
+
+        final GridCacheAtomicSequenceImpl seq1 = (GridCacheAtomicSequenceImpl)grid(0).atomicSequence(seqName, 0, true);
+        final GridCacheAtomicSequenceImpl seq2 = (GridCacheAtomicSequenceImpl)grid(1).atomicSequence(seqName, 0, false);
+
+        // Local reservations.
+        assertEquals(1, seq1.incrementAndGet());
+        assertEquals(11, seq2.incrementAndGet());
+
+        assertEquals(new Long(1L), U.field(seq1, "locVal"));
+        assertEquals(new Long(9L), U.field(seq1, "upBound"));
+        assertEquals(new Long(11L), U.field(seq2, "locVal"));
+        assertEquals(new Long(19L), U.field(seq2, "upBound"));
+
+        assertEquals(9, seq1.addAndGet(8));
+        assertEquals(19, seq2.addAndGet(8));
+
+        assertEquals(new Long(9L), U.field(seq1, "locVal"));
+        assertEquals(new Long(9L), U.field(seq1, "upBound"));
+        assertEquals(new Long(19L), U.field(seq2, "locVal"));
+        assertEquals(new Long(19L), U.field(seq2, "upBound"));
+
+        // New reservation (reverse order)
+        assertEquals(20, seq2.incrementAndGet());
+        assertEquals(30, seq1.incrementAndGet());
+
+        assertEquals(new Long(30L), U.field(seq1, "locVal"));
+        assertEquals(new Long(39L), U.field(seq1, "upBound"));
+        assertEquals(new Long(20L), U.field(seq2, "locVal"));
+        assertEquals(new Long(29L), U.field(seq2, "upBound"));
+    }
+
+    /** @throws Exception If failed. */
     public void testUpdatedSync() throws Exception {
         checkUpdate(true);
     }
