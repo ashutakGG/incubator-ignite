@@ -36,6 +36,7 @@ import org.apache.ignite.internal.IgniteInternalFuture;
 import org.apache.ignite.internal.processors.cache.GridCacheContext;
 import org.apache.ignite.internal.processors.cache.IgniteInternalCache;
 import org.apache.ignite.internal.processors.cache.transactions.IgniteInternalTx;
+import org.apache.ignite.internal.util.future.GridFinishedFuture;
 import org.apache.ignite.internal.util.future.GridFutureAdapter;
 import org.apache.ignite.internal.util.typedef.F;
 import org.apache.ignite.internal.util.typedef.internal.A;
@@ -116,7 +117,7 @@ public final class GridCacheAtomicSequenceImpl implements GridCacheAtomicSequenc
     /** Add and get cache call guard. */
     private final AtomicBoolean updateGuard = new AtomicBoolean();
 
-    private IgniteInternalFuture<?> reservationFut;
+    private IgniteInternalFuture<?> reservationFut = new GridFinishedFuture<>();
 
     /**
      * Empty constructor required by {@link Externalizable}.
@@ -245,7 +246,7 @@ public final class GridCacheAtomicSequenceImpl implements GridCacheAtomicSequenc
             lock.lock();
 
             try {
-                if ((reservedBottomBound == -1) && locVal + l >= reservationBound)
+                if (reservedBottomBound == -1 && reservationFut.isDone() && locVal + l >= reservationBound)
                     reservationFut = runAsyncReservation(); // TODO check reservationFut race
 
                 // If reserved range isn't exhausted.

@@ -206,49 +206,54 @@ public class GridCachePartitionedAtomicSequenceMultiThreadedTest extends IgniteA
 
         startGrid(1);
 
-        final GridCacheAtomicSequenceImpl seq1 = (GridCacheAtomicSequenceImpl)grid(0).atomicSequence(seqName, 0, true);
-        final GridCacheAtomicSequenceImpl seq2 = (GridCacheAtomicSequenceImpl)grid(1).atomicSequence(seqName, 0, false);
+        try {
+            final GridCacheAtomicSequenceImpl seq1 = (GridCacheAtomicSequenceImpl)grid(0).atomicSequence(seqName, 0, true);
+            final GridCacheAtomicSequenceImpl seq2 = (GridCacheAtomicSequenceImpl)grid(1).atomicSequence(seqName, 0, false);
 
-        assertSeqFields(seq1, /*locVal*/ 0, /*upBound*/ 10, /*resBound*/ 8, /*resBottomBound*/ -1, /*resUpBound*/ -1);
-        assertSeqFields(seq2, /*locVal*/ 10, /*upBound*/ 20, /*resBound*/ 18, /*resBottomBound*/ -1, /*resUpBound*/ -1);
+            assertSeqFields(seq1, /*locVal*/ 0, /*upBound*/ 10, /*resBound*/ 8, /*resBottomBound*/ -1, /*resUpBound*/ -1);
+            assertSeqFields(seq2, /*locVal*/ 10, /*upBound*/ 20, /*resBound*/ 18, /*resBottomBound*/ -1, /*resUpBound*/ -1);
 
-        assertEquals(1, seq1.incrementAndGet());
-        assertEquals(11, seq2.incrementAndGet());
+            assertEquals(1, seq1.incrementAndGet());
+            assertEquals(11, seq2.incrementAndGet());
 
-        assertSeqFields(seq1, /*locVal*/ 1, /*upBound*/ 10, /*resBound*/ 8, /*resBottomBound*/ -1, /*resUpBound*/ -1);
-        assertSeqFields(seq2, /*locVal*/ 11, /*upBound*/ 20, /*resBound*/ 18, /*resBottomBound*/ -1, /*resUpBound*/ -1);
+            assertSeqFields(seq1, /*locVal*/ 1, /*upBound*/ 10, /*resBound*/ 8, /*resBottomBound*/ -1, /*resUpBound*/ -1);
+            assertSeqFields(seq2, /*locVal*/ 11, /*upBound*/ 20, /*resBound*/ 18, /*resBottomBound*/ -1, /*resUpBound*/ -1);
 
-        assertEquals(7, seq1.addAndGet(6));
-        assertEquals(17, seq2.addAndGet(6));
+            assertEquals(7, seq1.addAndGet(6));
+            assertEquals(17, seq2.addAndGet(6));
 
-        assertSeqFields(seq1, /*locVal*/ 7, /*upBound*/ 10, /*resBound*/ 8, /*resBottomBound*/ -1, /*resUpBound*/ -1);
-        assertSeqFields(seq2, /*locVal*/ 17, /*upBound*/ 20, /*resBound*/ 18, /*resBottomBound*/ -1, /*resUpBound*/ -1);
+            assertSeqFields(seq1, /*locVal*/ 7, /*upBound*/ 10, /*resBound*/ 8, /*resBottomBound*/ -1, /*resUpBound*/ -1);
+            assertSeqFields(seq2, /*locVal*/ 17, /*upBound*/ 20, /*resBound*/ 18, /*resBottomBound*/ -1, /*resUpBound*/ -1);
 
-        // New reservation (reverse order)
-        assertEquals(18, seq2.incrementAndGet());
+            // New reservation (reverse order)
+            assertEquals(18, seq2.incrementAndGet());
 
-        assertTrue(GridTestUtils.waitForCondition(new GridAbsPredicate() {
-            @Override public boolean apply() {
-                return !F.eq(U.field(seq2, "reservedBottomBound"), -1L);
-            }
-        }, 1000));
+            assertTrue(GridTestUtils.waitForCondition(new GridAbsPredicate() {
+                @Override public boolean apply() {
+                    return !F.eq(U.field(seq2, "reservedBottomBound"), -1L);
+                }
+            }, 1000));
 
-        assertEquals(8, seq1.incrementAndGet());
+            assertEquals(8, seq1.incrementAndGet());
 
-        assertTrue(GridTestUtils.waitForCondition(new GridAbsPredicate() {
-            @Override public boolean apply() {
-                return !F.eq(U.field(seq1, "reservedBottomBound"), -1L);
-            }
-        }, 1000));
+            assertTrue(GridTestUtils.waitForCondition(new GridAbsPredicate() {
+                @Override public boolean apply() {
+                    return !F.eq(U.field(seq1, "reservedBottomBound"), -1L);
+                }
+            }, 1000));
 
-        assertSeqFields(seq1, /*locVal*/ 8, /*upBound*/ 10, /*resBound*/ 38, /*resBottomBound*/ 30, /*resUpBound*/ 40);
-        assertSeqFields(seq2, /*locVal*/ 18, /*upBound*/ 20, /*resBound*/ 28, /*resBottomBound*/ 20, /*resUpBound*/ 30);
+            assertSeqFields(seq1, /*locVal*/ 8, /*upBound*/ 10, /*resBound*/ 38, /*resBottomBound*/ 30, /*resUpBound*/ 40);
+            assertSeqFields(seq2, /*locVal*/ 18, /*upBound*/ 20, /*resBound*/ 28, /*resBottomBound*/ 20, /*resUpBound*/ 30);
 
-        assertEquals(30, seq1.addAndGet(7));
-        assertEquals(20, seq2.addAndGet(2));
+            assertEquals(30, seq1.addAndGet(7));
+            assertEquals(20, seq2.addAndGet(2));
 
-        assertSeqFields(seq1, /*locVal*/ 30, /*upBound*/ 40, /*resBound*/ 38, /*resBottomBound*/ -1, /*resUpBound*/ -1);
-        assertSeqFields(seq2, /*locVal*/ 20, /*upBound*/ 30, /*resBound*/ 28, /*resBottomBound*/ -1, /*resUpBound*/ -1);
+            assertSeqFields(seq1, /*locVal*/ 30, /*upBound*/ 40, /*resBound*/ 38, /*resBottomBound*/ -1, /*resUpBound*/ -1);
+            assertSeqFields(seq2, /*locVal*/ 20, /*upBound*/ 30, /*resBound*/ 28, /*resBottomBound*/ -1, /*resUpBound*/ -1);
+        }
+        finally {
+            stopGrid(1);
+        }
     }
 
     /**
@@ -274,26 +279,31 @@ public class GridCachePartitionedAtomicSequenceMultiThreadedTest extends IgniteA
 
         startGrid(1);
 
-        final GridCacheAtomicSequenceImpl seq1 = (GridCacheAtomicSequenceImpl)grid(0).atomicSequence(seqName, 0, true);
-        final GridCacheAtomicSequenceImpl seq2 = (GridCacheAtomicSequenceImpl)grid(1).atomicSequence(seqName, 0, false);
+        try {
+            final GridCacheAtomicSequenceImpl seq1 = (GridCacheAtomicSequenceImpl)grid(0).atomicSequence(seqName, 0, true);
+            final GridCacheAtomicSequenceImpl seq2 = (GridCacheAtomicSequenceImpl)grid(1).atomicSequence(seqName, 0, false);
 
-        assertEquals(1, seq1.incrementAndGet());
-        assertEquals(11, seq2.incrementAndGet());
+            assertEquals(1, seq1.incrementAndGet());
+            assertEquals(11, seq2.incrementAndGet());
 
-        assertEquals(new Long(1L), U.field(seq1, "locVal"));
-        assertEquals(new Long(10L), U.field(seq1, "upBound"));
-        assertEquals(new Long(11L), U.field(seq2, "locVal"));
-        assertEquals(new Long(20L), U.field(seq2, "upBound"));
+            assertEquals(new Long(1L), U.field(seq1, "locVal"));
+            assertEquals(new Long(10L), U.field(seq1, "upBound"));
+            assertEquals(new Long(11L), U.field(seq2, "locVal"));
+            assertEquals(new Long(20L), U.field(seq2, "upBound"));
 
-        assertEquals(31, seq2.addAndGet(20));
+            assertEquals(31, seq2.addAndGet(20));
 
-        assertEquals(new Long(1L), U.field(seq1, "locVal"));
-        assertEquals(new Long(10L), U.field(seq1, "upBound"));
-        assertEquals(new Long(31L), U.field(seq2, "locVal"));
-        assertEquals(new Long(40L), U.field(seq2, "upBound"));
+            assertEquals(new Long(1L), U.field(seq1, "locVal"));
+            assertEquals(new Long(10L), U.field(seq1, "upBound"));
+            assertEquals(new Long(31L), U.field(seq2, "locVal"));
+            assertEquals(new Long(40L), U.field(seq2, "upBound"));
 
-        // Jump
-        assertEquals(40, seq1.addAndGet(23));
+            // Jump
+            assertEquals(40, seq1.addAndGet(23));
+        }
+        finally {
+            stopGrid(1);
+        }
     }
 
     /** @throws Exception If failed. */
@@ -404,6 +414,15 @@ public class GridCachePartitionedAtomicSequenceMultiThreadedTest extends IgniteA
 
     /** @throws Exception If failed. */
     public void testGetAndAdd() throws Exception {
+        checkGetAndAdd(5);
+    }
+
+    /** @throws Exception If failed. */
+    public void testGetAndAdd2() throws Exception {
+        checkGetAndAdd(3);
+    }
+
+    public void checkGetAndAdd(final int val) throws Exception {
         // Random sequence names.
         String seqName = UUID.randomUUID().toString();
 
@@ -411,7 +430,7 @@ public class GridCachePartitionedAtomicSequenceMultiThreadedTest extends IgniteA
 
         runSequenceClosure(new GridInUnsafeClosure<IgniteAtomicSequence>() {
             @Override public void apply(IgniteAtomicSequence t) {
-                t.getAndAdd(5);
+                t.getAndAdd(val);
             }
         }, seq, ITERATION_NUM, THREAD_NUM);
 
