@@ -243,10 +243,12 @@ public final class GridCacheAtomicSequenceImpl implements GridCacheAtomicSequenc
         while (true) {
             checkRemoved();
 
-            lock.lock();
+            lock.lock(); // TODO locks here?
 
             try {
-                if (reservedBottomBound == -1 && reservationFut.isDone() && locVal + l >= reservationBound)
+                if (locVal + l >= reservationBound && reservationFut.isDone()
+                    // Checks that results of an execution of the last future has been already processed.
+                    && reservedBottomBound == -1)
                     reservationFut = runAsyncReservation(); // TODO check reservationFut race
 
                 // If reserved range isn't exhausted.
@@ -257,6 +259,31 @@ public final class GridCacheAtomicSequenceImpl implements GridCacheAtomicSequenc
 
                     return updated ? locVal : curVal;
                 }
+
+                // Do upBound update only at first arrived thread.
+                if (reservedBottomBound > 0) {
+                    assert reservedUpBound > 0 : "Reserved up bound: " + reservedUpBound;
+
+                    if (locVal + l < reservedUpBound) {
+                        long curVal = locVal;
+
+                        locVal = (locVal + l < reservedBottomBound) ? reservedBottomBound : locVal + l;
+
+                        upBound = reservedUpBound;
+
+                        // Reset reserved bounds.
+                        reservedBottomBound = -1;
+                        reservedUpBound = -1;
+
+                        return updated ? locVal : curVal;
+                    }
+                    else {
+                        // TODO do something here
+                        // Reset reserved bounds.
+                        reservedBottomBound = -1;
+                        reservedUpBound = -1;
+                    }
+                }
             }
             finally {
                 lock.unlock();
@@ -264,41 +291,6 @@ public final class GridCacheAtomicSequenceImpl implements GridCacheAtomicSequenc
 
             // If reserved range is exhausted.
             reservationFut.get();
-
-            checkRemoved(); // TODO checkRemoved ?!
-
-            if (reservedBottomBound > 0) {
-                lock.lock();
-
-                try {
-                    // Do upBound update only at first arrived thread.
-                    if (reservedBottomBound > 0) {
-                        assert reservedUpBound > 0 : "Reserved up bound: " + reservedUpBound;
-
-                        if (locVal + l < reservedUpBound) {
-                            long curVal = locVal;
-
-                            locVal = (locVal + l < reservedBottomBound) ? reservedBottomBound : locVal + l;
-
-                            upBound = reservedUpBound;
-
-                            // Reset reserved bounds.
-                            reservedBottomBound = -1;
-                            reservedUpBound = -1;
-
-                            return updated ? locVal : curVal;
-                        }
-                        else {
-                            // Reset reserved bounds.
-                            reservedBottomBound = -1;
-                            reservedUpBound = -1;
-                        }
-                    }
-                }
-                finally {
-                    lock.unlock();
-                }
-            }
         }
     }
 

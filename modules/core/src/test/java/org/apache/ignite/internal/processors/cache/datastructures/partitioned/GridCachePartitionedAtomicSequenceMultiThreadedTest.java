@@ -323,54 +323,6 @@ public class GridCachePartitionedAtomicSequenceMultiThreadedTest extends IgniteA
 
         final IgniteAtomicSequence seq = grid(0).atomicSequence(seqName, 0L, true);
 
-        // Warm up.
-        log.info(">>>>> Warm up");
-
-        runSequenceClosure(new GridInUnsafeClosure<IgniteAtomicSequence>() {
-            @Override public void apply(IgniteAtomicSequence t) {
-                t.incrementAndGet();
-            }
-        }, seq, ITERATION_NUM * 3, THREAD_NUM);
-
-        log.info(">>>>> Warm up finished.");
-
-        long[] res = new long[20];
-
-        for (int i = 0; i < res.length; i++) {
-            long start = U.currentTimeMillis();
-
-            runSequenceClosure(new GridInUnsafeClosure<IgniteAtomicSequence>() {
-                @Override public void apply(IgniteAtomicSequence t) {
-                    t.incrementAndGet();
-                }
-            }, seq, ITERATION_NUM, THREAD_NUM);
-
-            long duration = U.currentTimeMillis() - start;
-
-            log.info(">>>>> Duration = " + duration);
-
-            res[i] = duration;
-        }
-
-        long avgDuration = 0;
-
-        for (long duration : res)
-            avgDuration += duration;
-
-        avgDuration /= res.length;
-
-        log.info(">>>>> Average Duration = " + avgDuration);
-
-//        assertEquals(ITERATION_NUM * THREAD_NUM, seq.get());
-    }
-
-    /** @throws Exception If failed. */
-    public void testIncrementAndGetAsync() throws Exception {
-        // Random sequence names.
-        String seqName = UUID.randomUUID().toString();
-
-        final IgniteAtomicSequence seq = grid(0).atomicSequence(seqName, 0L, true);
-
         runSequenceClosure(new GridInUnsafeClosure<IgniteAtomicSequence>() {
             @Override public void apply(IgniteAtomicSequence t) {
                 t.incrementAndGet();
@@ -378,6 +330,36 @@ public class GridCachePartitionedAtomicSequenceMultiThreadedTest extends IgniteA
         }, seq, ITERATION_NUM, THREAD_NUM);
 
         assertEquals(ITERATION_NUM * THREAD_NUM, seq.get());
+    }
+
+    /** @throws Exception If failed. */
+    public void testIncrementAndGet2Nodes() throws Exception {
+        startGrid(1);
+
+        try {
+            // Random sequence names.
+            String seqName = UUID.randomUUID().toString();
+
+            final IgniteAtomicSequence seq1 = grid(0).atomicSequence(seqName, 0L, true);
+            final IgniteAtomicSequence seq2 = grid(1).atomicSequence(seqName, 0L, true);
+
+            runSequenceClosure(new GridInUnsafeClosure<IgniteAtomicSequence>() {
+                @Override public void apply(IgniteAtomicSequence t) {
+                    t.incrementAndGet();
+                }
+            }, seq1, ITERATION_NUM, THREAD_NUM);
+
+            runSequenceClosure(new GridInUnsafeClosure<IgniteAtomicSequence>() {
+                @Override public void apply(IgniteAtomicSequence t) {
+                    t.incrementAndGet();
+                }
+            }, seq2, ITERATION_NUM, THREAD_NUM);
+
+            assertEquals(2 * ITERATION_NUM * THREAD_NUM, seq1.get());
+        }
+        finally {
+            stopGrid(1);
+        }
     }
 
     /** @throws Exception If failed. */
@@ -422,7 +404,11 @@ public class GridCachePartitionedAtomicSequenceMultiThreadedTest extends IgniteA
         checkGetAndAdd(3);
     }
 
-    public void checkGetAndAdd(final int val) throws Exception {
+    /**
+     * @param val Value.
+     * @throws Exception If failed.
+     */
+    private void checkGetAndAdd(final int val) throws Exception {
         // Random sequence names.
         String seqName = UUID.randomUUID().toString();
 
@@ -434,7 +420,7 @@ public class GridCachePartitionedAtomicSequenceMultiThreadedTest extends IgniteA
             }
         }, seq, ITERATION_NUM, THREAD_NUM);
 
-        assertEquals(5 * ITERATION_NUM * THREAD_NUM, seq.get());
+        assertEquals(val * ITERATION_NUM * THREAD_NUM, seq.get());
     }
 
     /** @throws Exception If failed. */
