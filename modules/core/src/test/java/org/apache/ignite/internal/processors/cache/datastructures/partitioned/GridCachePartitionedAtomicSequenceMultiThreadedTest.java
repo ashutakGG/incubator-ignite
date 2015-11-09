@@ -343,25 +343,29 @@ public class GridCachePartitionedAtomicSequenceMultiThreadedTest extends IgniteA
             final IgniteAtomicSequence seq1 = grid(0).atomicSequence(seqName, 0L, true);
             final IgniteAtomicSequence seq2 = grid(1).atomicSequence(seqName, 0L, true);
 
-            runSequenceClosure(new GridInUnsafeClosure<IgniteAtomicSequence>() {
-                @Override public void apply(IgniteAtomicSequence t) {
-                    t.incrementAndGet();
+            multithreaded(new Runnable() {
+                @Override public void run() {
+                    for (int i = 0; i < ITERATION_NUM; i++) {
+                        if (i % 2 == 0)
+                            seq1.incrementAndGet();
+                        else
+                            seq2.incrementAndGet();
+                    }
                 }
-            }, seq1, ITERATION_NUM, THREAD_NUM);
+            }, THREAD_NUM);
 
-            runSequenceClosure(new GridInUnsafeClosure<IgniteAtomicSequence>() {
-                @Override public void apply(IgniteAtomicSequence t) {
-                    t.incrementAndGet();
-                }
-            }, seq2, ITERATION_NUM, THREAD_NUM);
+            // TODO remove
+            log.info(">>>>>> seq1.get() = " + seq1.get());
+            log.info(">>>>>> seq2.get() = " + seq2.get());
 
-            assertEquals(2 * ITERATION_NUM * THREAD_NUM, seq1.get());
+            assertEquals(ITERATION_NUM * THREAD_NUM, seq1.get());
+            assertEquals(ITERATION_NUM * THREAD_NUM + 10, seq2.get());
         }
         finally {
             stopGrid(1);
         }
     }
-
+    
     /** @throws Exception If failed. */
     public void testGetAndIncrement() throws Exception {
         // Random sequence names.
