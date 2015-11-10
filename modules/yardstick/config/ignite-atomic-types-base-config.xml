@@ -43,7 +43,7 @@
             <bean class="org.apache.ignite.configuration.AtomicConfiguration">
                 <property name="backups" value="1"/>
 
-                <property name="atomicSequenceReserveSize" value="50"/>
+                <property name="atomicSequenceReserveSize" value="1000"/>
             </bean>
         </property>
     </bean>
