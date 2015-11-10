@@ -37,7 +37,6 @@ import org.apache.ignite.internal.processors.cache.GridCacheContext;
 import org.apache.ignite.internal.processors.cache.IgniteInternalCache;
 import org.apache.ignite.internal.processors.cache.transactions.IgniteInternalTx;
 import org.apache.ignite.internal.util.future.GridFinishedFuture;
-import org.apache.ignite.internal.util.future.GridFutureAdapter;
 import org.apache.ignite.internal.util.typedef.F;
 import org.apache.ignite.internal.util.typedef.internal.A;
 import org.apache.ignite.internal.util.typedef.internal.CU;
@@ -359,77 +358,8 @@ public final class GridCacheAtomicSequenceImpl implements GridCacheAtomicSequenc
                     throw new IgniteException(e);
                 }
             }
-        }, /*sys pool*/ true);
+        }, /*sys pool*/ false);
     }
-
-//    @SuppressWarnings("SignalWithoutCorrespondingAwait")
-//    private long internalUpdate(long l, @Nullable Callable<Long> updateCall, boolean updated) throws IgniteCheckedException {
-//        checkRemoved();
-//
-//        assert l > 0;
-//
-//        lock.lock();
-//
-//        try {
-//            // If reserved range isn't exhausted.
-//            if (locVal + l <= upBound) {
-//                long curVal = locVal;
-//
-//                locVal += l;
-//
-//                return updated ? locVal : curVal;
-//            }
-//        }
-//        finally {
-//            lock.unlock();
-//        }
-//
-//        if (updateCall == null)
-//            updateCall = internalUpdate(l, updated);
-//
-//        while (true) {
-//            if (updateGuard.compareAndSet(false, true)) {
-//                try {
-//                    // This call must be outside lock.
-//                    return CU.outTx(updateCall, ctx);
-//                }
-//                finally {
-//                    lock.lock();
-//
-//                    try {
-//                        updateGuard.set(false);
-//
-//                        cond.signalAll();
-//                    }
-//                    finally {
-//                        lock.unlock();
-//                    }
-//                }
-//            }
-//            else {
-//                lock.lock();
-//
-//                try {
-//                    while (locVal >= upBound && updateGuard.get())
-//                        U.await(cond, 500, MILLISECONDS);
-//
-//                    checkRemoved();
-//
-//                    // If reserved range isn't exhausted.
-//                    if (locVal + l <= upBound) {
-//                        long curVal = locVal;
-//
-//                        locVal += l;
-//
-//                        return updated ? locVal : curVal;
-//                    }
-//                }
-//                finally {
-//                    lock.unlock();
-//                }
-//            }
-//        }
-//    }
 
     /** Get local batch size for this sequences.
      *
@@ -524,144 +454,6 @@ public final class GridCacheAtomicSequenceImpl implements GridCacheAtomicSequenc
         }
     }
 
-//    /**
-//     * Method returns callable for execution all update operations in async and sync mode.
-//     *
-//     * @param l Value will be added to sequence.
-//     * @param updated If {@code true}, will return updated value, if {@code false}, will return previous value.
-//     * @return Callable for execution in async and sync mode.
-//     */
-//    @SuppressWarnings("TooBroadScope")
-//    private Callable<Long> internalUpdate(final long l1, final boolean updated, boolean mine) {
-//        return retryTopologySafe(new Callable<Long>() {
-//            @Override public Long call() throws Exception {
-//                try (IgniteInternalTx tx = CU.txStartInternal(ctx, seqView, PESSIMISTIC, REPEATABLE_READ)) {
-//                    GridCacheAtomicSequenceValue seq = seqView.get(key);
-//
-//                    checkRemoved();
-//
-//                    assert seq != null;
-//
-//                    long curLocVal;
-//
-//                    long newUpBound;
-//
-//                    lock.lock();
-//
-//                    try {
-//                        curLocVal = locVal;
-//
-//                        // If local range was already reserved in another thread.
-//                        if (locVal + l <= upBound) {
-//                            long retVal = locVal;
-//
-//                            locVal += l;
-//
-//                            return updated ? locVal : retVal;
-//                        }
-//
-//                        long curGlobalVal = seq.get();
-//
-//                        long newLocVal;
-//
-//                        /* We should use offset because we already reserved left side of range.*/
-//                        long off = batchSize > 1 ? batchSize - 1 : 1;
-//
-//                        // Calculate new values for local counter, global counter and upper bound.
-//                        if (curLocVal + l >= curGlobalVal) {
-//                            newLocVal = curLocVal + l;
-//
-//                            newUpBound = newLocVal + off;
-//                        }
-//                        else {
-//                            newLocVal = curGlobalVal;
-//
-//                            newUpBound = newLocVal + off;
-//                        }
-//
-//                        locVal = newLocVal;
-//                        upBound = newUpBound;
-//
-//                        if (updated)
-//                            curLocVal = newLocVal;
-//                    }
-//                    finally {
-//                        lock.unlock();
-//                    }
-//
-//                    // Global counter must be more than reserved upper bound.
-//                    seq.set(newUpBound + 1);
-//
-//                    seqView.put(key, seq);
-//
-//                    tx.commit();
-//
-//                    return curLocVal;
-//                }
-//                catch (Error | Exception e) {
-//                    U.error(log, "Failed to get and add: " + this, e);
-//
-//                    throw e;
-//                }
-//            }
-//        });
-//    }
-
-    /**
-     * Method returns callable for execution all update operations in async and sync mode.
-     *
-     * @param l Value will be added to sequence.
-     * @param updated If {@code true}, will return updated value, if {@code false}, will return previous value.
-     * @return Callable for execution in async and sync mode.
-     */
-    @SuppressWarnings("TooBroadScope")
-    private Callable<Void> reserveNewRange() {
-        return retryTopologySafe(new Callable<Void>() {
-            @Override public Void call() throws Exception {
-                try (IgniteInternalTx tx = CU.txStartInternal(ctx, seqView, PESSIMISTIC, REPEATABLE_READ)) {
-                    GridCacheAtomicSequenceValue seq = seqView.get(key);
-
-                    checkRemoved();
-
-                    assert seq != null;
-
-                    long newUpBound;
-
-                    lock.lock();
-
-                    try {
-                        long curGlobalVal = seq.get();
-
-                        reservedBottomBound = curGlobalVal;
-
-                        newUpBound = curGlobalVal + batchSize;
-
-                        reservedUpBound = newUpBound;
-
-                        reservationBound = reservedBottomBound + (batchSize * percentage / 100);
-                    }
-                    finally {
-                        lock.unlock();
-                    }
-
-                    // Global counter must be more than reserved upper bound.
-                    seq.set(newUpBound);
-
-                    seqView.put(key, seq);
-
-                    tx.commit();
-                }
-                catch (Error | Exception e) {
-                    U.error(log, "Failed to get and add: " + this, e);
-
-                    throw e;
-                }
-
-                return null;
-            }
-        });
-    }
-
     /** {@inheritDoc} */
     @Override public void writeExternal(ObjectOutput out) throws IOException {
         out.writeObject(ctx.kernalContext());
@@ -699,15 +491,5 @@ public final class GridCacheAtomicSequenceImpl implements GridCacheAtomicSequenc
     /** {@inheritDoc} */
     @Override public String toString() {
         return S.toString(GridCacheAtomicSequenceImpl.class, this);
-    }
-
-    /**
-     * TODO impl
-     */
-    private static class ReservationFuture extends GridFutureAdapter<Long> {
-        /** */
-        private static final long serialVersionUID = 0L;
-
-        // No-op.
     }
 }

@@ -337,7 +337,6 @@ public class GridCachePartitionedAtomicSequenceMultiThreadedTest extends IgniteA
         startGrid(1);
 
         try {
-            // Random sequence names.
             String seqName = UUID.randomUUID().toString();
 
             final IgniteAtomicSequence seq1 = grid(0).atomicSequence(seqName, 0L, true);
@@ -354,18 +353,17 @@ public class GridCachePartitionedAtomicSequenceMultiThreadedTest extends IgniteA
                 }
             }, THREAD_NUM);
 
-            // TODO remove
-            log.info(">>>>>> seq1.get() = " + seq1.get());
-            log.info(">>>>>> seq2.get() = " + seq2.get());
+            long seq1Val = seq1.get();
+            long seq2Val = seq2.get();
 
-            assertEquals(ITERATION_NUM * THREAD_NUM, seq1.get());
-            assertEquals(ITERATION_NUM * THREAD_NUM + 10, seq2.get());
+            assertEquals(ITERATION_NUM * THREAD_NUM + (seq1Val < seq2Val ? 0 : 10), seq1Val);
+            assertEquals(ITERATION_NUM * THREAD_NUM + (seq1Val < seq2Val ? 10 : 0), seq2Val);
         }
         finally {
             stopGrid(1);
         }
     }
-    
+
     /** @throws Exception If failed. */
     public void testGetAndIncrement() throws Exception {
         // Random sequence names.
