@@ -103,9 +103,9 @@ public final class GridCacheAtomicSequenceImpl implements GridCacheAtomicSequenc
     /** Sequence batch size */
     private volatile int batchSize;
 
-    // TODO
+    // TODO or default 80?
     /** */
-    private int percentage = 80;
+    private int percentage;
 
     /** Synchronization lock. */
     private final Lock lock = new ReentrantLock();
@@ -142,6 +142,7 @@ public final class GridCacheAtomicSequenceImpl implements GridCacheAtomicSequenc
         IgniteInternalCache<GridCacheInternalKey, GridCacheAtomicSequenceValue> seqView,
         GridCacheContext ctx,
         int batchSize,
+        int percentage,
         long locVal,
         long upBound)
     {
@@ -149,7 +150,7 @@ public final class GridCacheAtomicSequenceImpl implements GridCacheAtomicSequenc
         assert seqView != null;
         assert ctx != null;
         assert locVal <= upBound;
-        assert percentage > 0 && percentage <= 100 : "Percentage: " + percentage;
+        assert percentage >= 0 && percentage <= 100 : "Percentage: " + percentage;
 
         this.batchSize = batchSize;
         this.ctx = ctx;
@@ -158,7 +159,9 @@ public final class GridCacheAtomicSequenceImpl implements GridCacheAtomicSequenc
         this.upBound = upBound + 1; // TODO +1 ?
         this.locVal = locVal;
         this.name = name;
-        this.reservationBound = locVal + (batchSize * percentage / 100); // TODO newVal ?
+        this.percentage = percentage; // TODO check 0 and 100%
+        
+        reservationBound = locVal + (batchSize * percentage / 100); // TODO newVal ?
 
         log = ctx.logger(getClass());
     }
