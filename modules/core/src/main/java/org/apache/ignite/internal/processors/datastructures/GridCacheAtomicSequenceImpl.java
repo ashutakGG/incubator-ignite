@@ -24,8 +24,6 @@ import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.io.ObjectStreamException;
 import java.util.concurrent.Callable;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import org.apache.ignite.IgniteCheckedException;
@@ -107,15 +105,11 @@ public final class GridCacheAtomicSequenceImpl implements GridCacheAtomicSequenc
     /** */
     private int percentage;
 
+    // TODO check with synchronized
     /** Synchronization lock. */
     private final Lock lock = new ReentrantLock();
 
-    /** Await condition. */
-    private Condition cond = lock.newCondition();
-
-    /** Add and get cache call guard. */
-    private final AtomicBoolean updateGuard = new AtomicBoolean();
-
+    /** Reservation future. */
     private IgniteInternalFuture<?> reservationFut = new GridFinishedFuture<>();
 
     /**
@@ -160,7 +154,7 @@ public final class GridCacheAtomicSequenceImpl implements GridCacheAtomicSequenc
         this.locVal = locVal;
         this.name = name;
         this.percentage = percentage; // TODO check 0 and 100%
-        
+
         reservationBound = locVal + (batchSize * percentage / 100); // TODO newVal ?
 
         log = ctx.logger(getClass());
@@ -248,10 +242,11 @@ public final class GridCacheAtomicSequenceImpl implements GridCacheAtomicSequenc
             lock.lock(); // TODO locks here?
 
             try {
-                if (locVal + l >= reservationBound && reservationFut.isDone()
-                    // Checks that results of an execution of the last future has been already processed.
-                    && reservedBottomBound == -1)
-                    reservationFut = runAsyncReservation(); // TODO check reservationFut race
+                if (locVal + l >= reservationBound
+                    // Checks that results of an execution
+                    // of the last future has been already processed (if future is alreafy done).
+                    && reservedBottomBound == -1 && reservationFut.isDone())
+                    reservationFut = runAsyncReservation();
 
                 // If reserved range isn't exhausted.
                 if (locVal + l < upBound) {
@@ -262,8 +257,8 @@ public final class GridCacheAtomicSequenceImpl implements GridCacheAtomicSequenc
                     return updated ? locVal : curVal;
                 }
 
-                // Do upBound update only at first arrived thread.
-                if (reservedBottomBound > 0) {
+                // Check a future is done and results not processed yet.
+                if (reservedBottomBound > 0 && reservationFut.isDone()) {// TODO wrong check because transaction can be not finished yet
                     assert reservedUpBound > 0 : "Reserved up bound: " + reservedUpBound;
 
                     if (locVal + l < reservedUpBound) {
@@ -284,6 +279,9 @@ public final class GridCacheAtomicSequenceImpl implements GridCacheAtomicSequenc
                         // Reset reserved bounds.
                         reservedBottomBound = -1;
                         reservedUpBound = -1;
+
+                        // TODO delete
+                        throw new IllegalStateException();
                     }
                 }
             }
@@ -318,20 +316,19 @@ public final class GridCacheAtomicSequenceImpl implements GridCacheAtomicSequenc
                             lock.lock();
 
                             try {
-                                // Checks that no one before not updated the range.
-                                if (reservedBottomBound == -1) {
-                                    assert reservedUpBound == -1 : "Reserved up bound: " + reservedUpBound;
+                                assert reservedBottomBound == -1 && reservedUpBound == -1 : "Previos calculation " +
+                                    "results have not been processed [reservedBottomBound=" + reservedBottomBound
+                                    + ", reservedUpBound=" + reservedUpBound + "]";
 
-                                    long curGlobalVal = seq.get();
+                                long curGlobalVal = seq.get();
 
-                                    reservedBottomBound = curGlobalVal;
+                                reservedBottomBound = curGlobalVal;
 
-                                    newUpBound = curGlobalVal + batchSize;
+                                newUpBound = curGlobalVal + batchSize;
 
-                                    reservedUpBound = newUpBound;
+                                reservedUpBound = newUpBound;
 
-                                    reservationBound = reservedBottomBound + (batchSize * percentage / 100);
-                                }
+                                reservationBound = reservedBottomBound + (batchSize * percentage / 100);
                             }
                             finally {
                                 lock.unlock();
