@@ -49,7 +49,7 @@ public class AtomicConfiguration {
     private int backups = DFLT_BACKUPS;
 
     /** Atomic sequence reservation percentage. */
-    private int atomicSeqReservationPercentage = DFLT_ATOMIC_SEQUENCE_RESERVE_PERCENTAGE;
+    private int atomicSeqReservePercentage = DFLT_ATOMIC_SEQUENCE_RESERVE_PERCENTAGE;
 
     /**
      * @return Number of backup nodes.
@@ -109,17 +109,17 @@ public class AtomicConfiguration {
      *
      * @return Atomic sequence reservation percentage.
      */
-    public int getAtomicSequenceReservationPercentage() {
-        return atomicSeqReservationPercentage;
+    public int getAtomicSequenceReservePercentage() {
+        return atomicSeqReservePercentage;
     }
 
     /**
      * TODO
      * *
-     * @param atomicSeqReservationPercentage Atomic sequence reservation percentage.
+     * @param atomicSeqReservePercentage Atomic sequence reservation percentage.
      */
-    public void setAtomicSequenceReservationPercentage(int atomicSeqReservationPercentage) {
-        this.atomicSeqReservationPercentage = atomicSeqReservationPercentage;
+    public void setAtomicSequenceReservePercentage(int atomicSeqReservePercentage) {
+        this.atomicSeqReservePercentage = atomicSeqReservePercentage;
     }
 
     /** {@inheritDoc} */

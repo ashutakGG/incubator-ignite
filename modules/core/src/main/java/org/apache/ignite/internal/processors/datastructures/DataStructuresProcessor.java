@@ -327,18 +327,18 @@ public final class DataStructuresProcessor extends GridProcessorAdapter {
                     // Update global counter.
                     dsView.put(key, seqVal);
 
-                    int percentage = atomicCfg.getAtomicSequenceReservationPercentage();
+                    int reservePercentage = atomicCfg.getAtomicSequenceReservePercentage();
 
-                    if (percentage < 0 || percentage > 100)
-                        percentage = AtomicConfiguration.DFLT_ATOMIC_SEQUENCE_RESERVE_PERCENTAGE;
-                    
+                    if (reservePercentage < 0 || reservePercentage > 100)
+                        reservePercentage = AtomicConfiguration.DFLT_ATOMIC_SEQUENCE_RESERVE_PERCENTAGE;
+
                     // Only one thread can be in the transaction scope and create sequence.
                     seq = new GridCacheAtomicSequenceImpl(name,
                         key,
                         seqView,
                         dsCacheCtx,
                         atomicCfg.getAtomicSequenceReserveSize(),
-                        percentage,
+                        reservePercentage,
                         locCntr,
                         upBound);
 
