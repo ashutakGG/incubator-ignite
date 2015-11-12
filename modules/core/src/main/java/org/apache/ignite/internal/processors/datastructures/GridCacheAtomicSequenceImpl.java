@@ -245,7 +245,7 @@ public final class GridCacheAtomicSequenceImpl implements GridCacheAtomicSequenc
 
             try {
                 if (locVal + l >= newReservationLine && isReserveFutResultsProcessed && reservationFut.isDone())
-                    reservationFut = runAsyncReservation();
+                    reservationFut = runAsyncReservation(0);
 
                 // If reserved range isn't exhausted.
                 if (locVal + l < upBound) {
@@ -268,6 +268,8 @@ public final class GridCacheAtomicSequenceImpl implements GridCacheAtomicSequenc
 
                         return updated ? locVal : curVal;
                     }
+                    else
+                        reservationFut = runAsyncReservation(locVal + l - reservedUpBound);
                 }
             }
             finally {
@@ -282,9 +284,12 @@ public final class GridCacheAtomicSequenceImpl implements GridCacheAtomicSequenc
     /**
      * Runs async reservation of new range for current node.
      *
+     * @param off Offset.
      * @return Future.
      */
-    private IgniteInternalFuture<?> runAsyncReservation() {
+    private IgniteInternalFuture<?> runAsyncReservation(final long off) {
+        assert off >= 0 : "Offset: " + off;
+
         return ctx.kernalContext().closure().runLocalSafe(new Runnable() {
             @Override public void run() {
                 Callable<Void> reserveCall = retryTopologySafe(new Callable<Void>() {
@@ -307,9 +312,9 @@ public final class GridCacheAtomicSequenceImpl implements GridCacheAtomicSequenc
 
                                 long curGlobalVal = seq.get();
 
-                                reservedBottomBound = curGlobalVal;
+                                reservedBottomBound = curGlobalVal + off;
 
-                                newUpBound = curGlobalVal + batchSize;
+                                newUpBound = reservedBottomBound + batchSize;
 
                                 reservedUpBound = newUpBound;
 
@@ -319,8 +324,7 @@ public final class GridCacheAtomicSequenceImpl implements GridCacheAtomicSequenc
                                 lock.unlock();
                             }
 
-                            if (newUpBound != -1)
-                                seq.set(newUpBound);
+                            seq.set(newUpBound);
 
                             seqView.put(key, seq);
 
@@ -346,21 +350,14 @@ public final class GridCacheAtomicSequenceImpl implements GridCacheAtomicSequenc
         }, /*sys pool*/ false);
     }
 
-    /** Get local batch size for this sequences.
-     *
-     * @return Sequence batch size.
-     */
+    /** {@inheritDoc} */
     @Override public int batchSize() {
         return batchSize;
     }
 
-    /**
-     * Set local batch size for this sequences.
-     *
-     * @param size Sequence batch size. Must be more then 0.
-     */
+    /** {@inheritDoc} */
     @Override public void batchSize(int size) {
-        A.ensure(size > 0, " Batch size can't be less then 0: " + size);
+        A.ensure(size > 0, "Batch size have to be more than 0: " + size);
 
         lock.lock();
 

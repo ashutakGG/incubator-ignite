@@ -160,6 +160,90 @@ public abstract class GridCacheAtomicSequenceMultiThreadedAbstractTest extends I
     }
 
     /** @throws Exception If failed. */
+    public void testValuesPercentage50() throws Exception {
+        String seqName = UUID.randomUUID().toString();
+
+        final GridCacheAtomicSequenceImpl seq = (GridCacheAtomicSequenceImpl)grid(0).atomicSequence(seqName, 0, true);
+
+        seq.reservePercentage(50);
+
+        assertSeqFields(seq, /*locVal*/ 0, /*upBound*/ 10, /*resBound*/ 8, /*resBottomBound*/ 0, /*resUpBound*/ 0);
+
+        // Exhaust a first reserved range to get recalculated values according to new reserve percentage.
+        assertEquals(10, seq.addAndGet(10));
+
+        assertSeqFields(seq, /*locVal*/ 10, /*upBound*/ 20, /*resBound*/ 15, /*resBottomBound*/ 10, /*resUpBound*/ 20);
+
+        assertEquals(15, seq.addAndGet(5));
+
+        GridTestUtils.waitForCondition(new GridAbsPredicate() {
+            @Override public boolean apply() {
+                return !F.eq(U.field(seq, "isReserveFutResultsProcessed"), true);
+            }
+        }, 1000);
+
+        assertSeqFields(seq, /*locVal*/ 15, /*upBound*/ 20, /*resBound*/ 25, /*resBottomBound*/ 20, /*resUpBound*/ 30);
+    }
+
+    /** @throws Exception If failed. */
+    public void testValuesPercentage0() throws Exception {
+        String seqName = UUID.randomUUID().toString();
+
+        final GridCacheAtomicSequenceImpl seq = (GridCacheAtomicSequenceImpl)grid(0).atomicSequence(seqName, 0, true);
+
+        seq.reservePercentage(0);
+
+        assertSeqFields(seq, /*locVal*/ 0, /*upBound*/ 10, /*resBound*/ 8, /*resBottomBound*/ 0, /*resUpBound*/ 0);
+
+        // Exhaust a first reserved range to get recalculated values according to new reserve percentage.
+        assertEquals(10, seq.addAndGet(10));
+
+        assertSeqFields(seq, /*locVal*/ 10, /*upBound*/ 20, /*resBound*/ 10, /*resBottomBound*/ 10, /*resUpBound*/ 20);
+
+        assertEquals(11, seq.addAndGet(1));
+
+        GridTestUtils.waitForCondition(new GridAbsPredicate() {
+            @Override public boolean apply() {
+                return !F.eq(U.field(seq, "isReserveFutResultsProcessed"), true);
+            }
+        }, 1000);
+
+        assertSeqFields(seq, /*locVal*/ 11, /*upBound*/ 20, /*resBound*/ 20, /*resBottomBound*/ 20, /*resUpBound*/ 30);
+
+        assertEquals(12, seq.incrementAndGet());
+
+        assertSeqFields(seq, /*locVal*/ 12, /*upBound*/ 20, /*resBound*/ 20, /*resBottomBound*/ 20, /*resUpBound*/ 30);
+
+        assertEquals(20, seq.addAndGet(8));
+
+        assertSeqFields(seq, /*locVal*/ 20, /*upBound*/ 30, /*resBound*/ 20, /*resBottomBound*/ 20, /*resUpBound*/ 30);
+    }
+
+    /** @throws Exception If failed. */
+    public void testValuesPercentage100() throws Exception {
+        String seqName = UUID.randomUUID().toString();
+
+        final GridCacheAtomicSequenceImpl seq = (GridCacheAtomicSequenceImpl)grid(0).atomicSequence(seqName, 0, true);
+
+        seq.reservePercentage(100);
+
+        assertSeqFields(seq, /*locVal*/ 0, /*upBound*/ 10, /*resBound*/ 8, /*resBottomBound*/ 0, /*resUpBound*/ 0);
+
+        // Exhaust a first reserved range to get recalculated values according to new reserve percentage.
+        assertEquals(10, seq.addAndGet(10));
+
+        assertSeqFields(seq, /*locVal*/ 10, /*upBound*/ 20, /*resBound*/ 20, /*resBottomBound*/ 10, /*resUpBound*/ 20);
+
+        assertEquals(19, seq.addAndGet(9));
+
+        assertSeqFields(seq, /*locVal*/ 19, /*upBound*/ 20, /*resBound*/ 20, /*resBottomBound*/ 10, /*resUpBound*/ 20);
+
+        assertEquals(20, seq.incrementAndGet());
+
+        assertSeqFields(seq, /*locVal*/ 20, /*upBound*/ 30, /*resBound*/ 30, /*resBottomBound*/ 20, /*resUpBound*/ 30);
+    }
+
+    /** @throws Exception If failed. */
     public void testValuesDoubleReservation() throws Exception {
         String seqName = UUID.randomUUID().toString();
 
