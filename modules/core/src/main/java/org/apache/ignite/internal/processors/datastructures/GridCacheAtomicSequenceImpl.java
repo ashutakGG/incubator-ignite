@@ -106,7 +106,7 @@ public final class GridCacheAtomicSequenceImpl implements GridCacheAtomicSequenc
 
     // TODO or default 80?
     /** */
-    private int percentage;
+    private volatile int percentage;
 
     // TODO check with synchronized
     /** Synchronization lock. */
@@ -133,7 +133,6 @@ public final class GridCacheAtomicSequenceImpl implements GridCacheAtomicSequenc
      * @param locVal Local counter.
      * @param upBound Upper bound.
      */
-    // TODO percentage as param.
     public GridCacheAtomicSequenceImpl(String name,
         GridCacheInternalKey key,
         IgniteInternalCache<GridCacheInternalKey, GridCacheAtomicSequenceValue> seqView,
@@ -367,6 +366,25 @@ public final class GridCacheAtomicSequenceImpl implements GridCacheAtomicSequenc
 
         try {
             batchSize = size;
+        }
+        finally {
+            lock.unlock();
+        }
+    }
+
+    /** {@inheritDoc} */
+    @Override public int reservePercentage() {
+        return percentage;
+    }
+
+    /** {@inheritDoc} */
+    @Override public void reservePercentage(int percentage) {
+        A.ensure(percentage >= 0 && percentage <= 100, "Invalid reserve percentage: " + percentage);
+
+        lock.lock();
+
+        try {
+            this.percentage = percentage;
         }
         finally {
             lock.unlock();
