@@ -277,6 +277,17 @@ public final class DataStructuresProcessor extends GridProcessorAdapter {
 
         checkAtomicsConfiguration();
 
+        if (atomicCfg.getAtomicSequenceReserveSize() <= 0)
+            throw new IgniteException("Atomic sequence can not be created, " +
+                "reserve size must be more than 0, but atomicSequenceReserveSize: "
+                + atomicCfg.getAtomicSequenceReserveSize());
+
+        int percentage = atomicCfg.getAtomicSequenceReservePercentage();
+
+        if (!(0 <= percentage && percentage <= 100))
+            throw new IgniteException("Atomic sequence can not be created, reserve percentage must have value " +
+                "between 0 and 100, but atomicSequenceReservePercentage: " + percentage);
+
         startQuery();
 
         return getAtomic(new IgniteOutClosureX<IgniteAtomicSequence>() {
@@ -300,37 +311,26 @@ public final class DataStructuresProcessor extends GridProcessorAdapter {
                     if (seqVal == null && !create)
                         return null;
 
-                    // We should use offset because we already reserved left side of range.
-                    long off = atomicCfg.getAtomicSequenceReserveSize() > 1 ?
-                        atomicCfg.getAtomicSequenceReserveSize() - 1 : 1;
-
                     long upBound;
                     long locCntr;
 
                     if (seqVal == null) {
                         locCntr = initVal;
 
-                        upBound = locCntr + off;
+                        upBound = locCntr + atomicCfg.getAtomicSequenceReserveSize();
 
-                        // Global counter must be more than reserved region.
-                        seqVal = new GridCacheAtomicSequenceValue(upBound + 1);
+                        seqVal = new GridCacheAtomicSequenceValue(upBound);
                     }
                     else {
                         locCntr = seqVal.get();
 
-                        upBound = locCntr + off;
+                        upBound = locCntr + atomicCfg.getAtomicSequenceReserveSize();
 
-                        // Global counter must be more than reserved region.
-                        seqVal.set(upBound + 1);
+                        seqVal.set(upBound);
                     }
 
                     // Update global counter.
                     dsView.put(key, seqVal);
-
-                    int reservePercentage = atomicCfg.getAtomicSequenceReservePercentage();
-
-                    if (reservePercentage < 0 || reservePercentage > 100)
-                        reservePercentage = AtomicConfiguration.DFLT_ATOMIC_SEQUENCE_RESERVE_PERCENTAGE;
 
                     // Only one thread can be in the transaction scope and create sequence.
                     seq = new GridCacheAtomicSequenceImpl(name,
@@ -338,7 +338,7 @@ public final class DataStructuresProcessor extends GridProcessorAdapter {
                         seqView,
                         dsCacheCtx,
                         atomicCfg.getAtomicSequenceReserveSize(),
-                        reservePercentage,
+                        atomicCfg.getAtomicSequenceReservePercentage(),
                         locCntr,
                         upBound);
 

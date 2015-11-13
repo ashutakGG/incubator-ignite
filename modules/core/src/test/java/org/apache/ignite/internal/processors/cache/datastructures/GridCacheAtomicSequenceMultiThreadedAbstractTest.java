@@ -340,20 +340,19 @@ public abstract class GridCacheAtomicSequenceMultiThreadedAbstractTest extends I
             assertEquals(1, seq1.incrementAndGet());
             assertEquals(11, seq2.incrementAndGet());
 
-            assertEquals(new Long(1L), U.field(seq1, "locVal"));
-            assertEquals(new Long(10L), U.field(seq1, "upBound"));
-            assertEquals(new Long(11L), U.field(seq2, "locVal"));
-            assertEquals(new Long(20L), U.field(seq2, "upBound"));
+            assertSeqFields(seq1,/*locVal*/ 1,/*upBound*/ 10,/*resBound*/ 8,/*resBottomBound*/ 0,/*resUpBound*/ 0);
+            assertSeqFields(seq2,/*locVal*/ 11,/*upBound*/ 20,/*resBound*/ 18,/*resBottomBound*/ 0,/*resUpBound*/ 0);
 
             assertEquals(31, seq2.addAndGet(20));
 
-            assertEquals(new Long(1L), U.field(seq1, "locVal"));
-            assertEquals(new Long(10L), U.field(seq1, "upBound"));
-            assertEquals(new Long(31L), U.field(seq2, "locVal"));
-            assertEquals(new Long(40L), U.field(seq2, "upBound"));
+            assertSeqFields(seq1,/*locVal*/ 1,/*upBound*/ 10,/*resBound*/ 8,/*resBottomBound*/ 0,/*resUpBound*/ 0);
+            assertSeqFields(seq2,/*locVal*/ 31,/*upBound*/ 40,/*resBound*/ 38,/*resBottomBound*/ 30,/*resUpBound*/ 40);
 
             // Jump
             assertEquals(40, seq1.addAndGet(23));
+
+            assertSeqFields(seq1,/*locVal*/ 40,/*upBound*/ 50,/*resBound*/ 48,/*resBottomBound*/ 40,/*resUpBound*/ 50);
+            assertSeqFields(seq2,/*locVal*/ 31,/*upBound*/ 40,/*resBound*/ 38,/*resBottomBound*/ 30,/*resUpBound*/ 40);
         }
         finally {
             stopGrid(1);

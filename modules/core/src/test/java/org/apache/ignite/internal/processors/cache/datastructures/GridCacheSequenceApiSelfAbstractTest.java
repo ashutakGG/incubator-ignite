@@ -33,7 +33,6 @@ import org.apache.ignite.internal.processors.cache.GridCacheAdapter;
 import org.apache.ignite.internal.processors.cache.GridCacheInternal;
 import org.apache.ignite.internal.processors.cache.GridCacheUtils;
 import org.apache.ignite.internal.processors.datastructures.GridCacheInternalKeyImpl;
-import org.apache.ignite.internal.util.typedef.G;
 import org.apache.ignite.testframework.GridTestUtils;
 import org.apache.ignite.transactions.Transaction;
 import org.eclipse.jetty.util.ConcurrentHashSet;
@@ -73,7 +72,7 @@ public abstract class GridCacheSequenceApiSelfAbstractTest extends IgniteAtomics
 
     /** {@inheritDoc} */
     @Override protected int gridCount() {
-        return 3;
+        return 1;
     }
 
     /** {@inheritDoc} */
@@ -119,8 +118,6 @@ public abstract class GridCacheSequenceApiSelfAbstractTest extends IgniteAtomics
             // Compare with default batch size.
             assertEquals(BATCH_SIZE, seq.batchSize());
         }
-
-        assertEquals(3, G.allGrids().size());
     }
 
     /** {@inheritDoc} */
@@ -318,6 +315,9 @@ public abstract class GridCacheSequenceApiSelfAbstractTest extends IgniteAtomics
      * @throws Exception If failed.
      */
     public void testMultiNodeSequenceIntegrity() throws Exception {
+        if (gridCount() < 2)
+            return;
+
         multiNodeSequenceIntegrity(/*batchSize*/ 1, /*percentage*/ 80, /*initVal*/0);
         multiNodeSequenceIntegrity(/*batchSize*/ 1, /*percentage*/ 0, /*initVal*/-11);
         multiNodeSequenceIntegrity(/*batchSize*/ 1, /*percentage*/ 100, /*initVal*/183);

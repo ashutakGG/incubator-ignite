@@ -100,7 +100,6 @@ public final class GridCacheAtomicSequenceImpl implements GridCacheAtomicSequenc
     /** Whether reserveFuture already processed or not.  */
     private boolean isReserveFutResultsProcessed = true;
 
-    // TODO volataile ?!
     /** Sequence batch size */
     private volatile int batchSize;
 
@@ -145,6 +144,7 @@ public final class GridCacheAtomicSequenceImpl implements GridCacheAtomicSequenc
         assert key != null;
         assert seqView != null;
         assert ctx != null;
+        assert batchSize > 0 : "BatchSize: " + batchSize;
         assert locVal <= upBound;
         assert percentage >= 0 && percentage <= 100 : "Percentage: " + percentage;
 
@@ -152,7 +152,7 @@ public final class GridCacheAtomicSequenceImpl implements GridCacheAtomicSequenc
         this.ctx = ctx;
         this.key = key;
         this.seqView = seqView;
-        this.upBound = upBound + 1; // TODO +1 ?
+        this.upBound = upBound;
         this.locVal = locVal;
         this.name = name;
         this.percentage = percentage; // TODO check 0 and 100%
@@ -268,8 +268,13 @@ public final class GridCacheAtomicSequenceImpl implements GridCacheAtomicSequenc
 
                         return updated ? locVal : curVal;
                     }
-                    else
-                        reservationFut = runAsyncReservation(locVal + l - reservedUpBound);
+                    else {
+                        long diff = locVal + l - reservedUpBound;
+
+                        long off = (diff / batchSize) * batchSize;
+
+                        reservationFut = runAsyncReservation(off);
+                    }
                 }
             }
             finally {
