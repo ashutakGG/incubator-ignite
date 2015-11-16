@@ -24,11 +24,11 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
-import org.apache.ignite.internal.util.typedef.X;
 import org.apache.ignite.internal.util.typedef.internal.U;
 import org.apache.ignite.yardstick.cache.model.Person;
 import org.yardstickframework.BenchmarkConfiguration;
@@ -75,7 +75,7 @@ public class H2Benchmark extends BenchmarkDriverAdapter {
      * @return Pooled connection.
      * @throws SQLException In case of error.
      */
-    private Connection openH2Connection(boolean autocommit) throws SQLException {
+    private static Connection openH2Connection(boolean autocommit) throws SQLException {
         System.setProperty("h2.serializeJavaObject", "false");
 
         String dbName = "test";
@@ -92,7 +92,7 @@ public class H2Benchmark extends BenchmarkDriverAdapter {
      *
      * @throws SQLException If exception.
      */
-    protected void initializeH2Schema() throws SQLException {
+    protected static void initializeH2Schema() throws SQLException {
         Statement st = conn.createStatement();
 
         st.execute("CREATE SCHEMA \"test\"");
@@ -113,10 +113,10 @@ public class H2Benchmark extends BenchmarkDriverAdapter {
      * @param p Person.
      * @throws SQLException If exception.
      */
-    private void insertInDb(Person p) throws SQLException {
+    private static void insertInDb(Person p) throws SQLException {
         try(PreparedStatement st = conn.prepareStatement("insert into \"test\".PERSON " +
             "(_key, _val, id, orgId, firstName, lastName, salary) values(?, ?, ?, ?, ?, ?, ?)")) {
-            st.setObject(1, p.getId());
+            st.setObject(1, p.getId(), Types.JAVA_OBJECT);
             st.setObject(2, p);
             st.setObject(3, p.getId());
             st.setObject(4, p.getOrganizationId());
@@ -134,7 +134,7 @@ public class H2Benchmark extends BenchmarkDriverAdapter {
 
         double maxSalary = salary + 1000;
 
-        String qry = "select _key, _val from PERSON where salary >= ? and salary <= ?";
+        String qry = "select _key, _val from \"test\".PERSON where salary >= ? and salary <= ?";
 
         List<List<?>> lists = executeH2Query(qry, salary, maxSalary);
 
@@ -173,11 +173,6 @@ public class H2Benchmark extends BenchmarkDriverAdapter {
             ResultSetMetaData meta = rs.getMetaData();
 
             int colCnt = meta.getColumnCount();
-
-            for (int i = 1; i <= colCnt; i++)
-                X.print(meta.getColumnLabel(i) + "  ");
-
-            X.println();
 
             while (rs.next()) {
                 List<Object> row = new ArrayList<>(colCnt);
