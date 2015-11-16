@@ -106,6 +106,8 @@ public class H2Benchmark extends BenchmarkDriverAdapter {
             "  orgId int not null," +
             "  salary double)");
 
+        st.execute("create INDEX person_salary_idx on \"test\".PERSON(salary)");
+
         conn.commit();
     }
 
