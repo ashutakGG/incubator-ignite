@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.ignite.internal.util.typedef.internal.U;
 import org.apache.ignite.yardstick.cache.model.Person;
 import org.yardstickframework.BenchmarkConfiguration;
@@ -37,35 +38,62 @@ import org.yardstickframework.BenchmarkDriverAdapter;
 import static org.yardstickframework.BenchmarkUtils.println;
 
 /**
- * TODO: Add class description.
+ *
  */
 public class H2Benchmark extends BenchmarkDriverAdapter {
+    /** Default DB options. */
+    private static final String DB_OPTIONS = ";LOCK_MODE=3;MULTI_THREADED=1;DB_CLOSE_ON_EXIT=FALSE" +
+        ";DEFAULT_LOCK_TIMEOUT=10000;FUNCTIONS_IN_SCHEMA=true;OPTIMIZE_REUSE_RESULTS=0;QUERY_CACHE_SIZE=0;" +
+        "RECOMPILE_ALWAYS=1;MAX_OPERATION_MEMORY=0";
+
     /** */
     // TODO from arguments?!
     public static final double RANGE = 1_000_000;
+
     /** */
-    private static Connection conn;
+    private static final String CONNECTION_KEY = "CONNECTION_KEY";
+
+    /** */
+    private Connection[] conns;
+
+    /** */
+    private final AtomicInteger threadNum = new AtomicInteger();
 
     /** {@inheritDoc} */
     @Override public void setUp(BenchmarkConfiguration cfg) throws Exception {
         super.setUp(cfg);
 
-        conn = openH2Connection(false);
+        conns = new Connection[cfg.threads()];
 
-        initializeH2Schema();
+        for (int i = 0; i < conns.length; i++)
+            conns[i] = openH2Connection(false);
+
+        Connection conn = conns[0];
+
+        initializeH2Schema(conn);
 
         println(cfg, "Populating query data...");
 
         long start = System.nanoTime();
 
         for (int i = 0; i < RANGE && !Thread.currentThread().isInterrupted(); i++) {
-            insertInDb(new Person(i, "firstName" + i, "lastName" + i, i * 1000));
+            insertInDb(conn, new Person(i, "firstName" + i, "lastName" + i, i * 1000));
 
             if (i % 100000 == 0)
                 println(cfg, "Populated persons: " + i);
         }
 
+        conn.commit();
+
         println(cfg, "Finished populating query data in " + ((System.nanoTime() - start) / 1_000_000) + " ms.");
+    }
+
+    /** {@inheritDoc} */
+    @Override public void tearDown() throws Exception {
+        super.tearDown();
+
+        for (Connection conn : conns)
+            conn.close();
     }
 
     /**
@@ -77,10 +105,11 @@ public class H2Benchmark extends BenchmarkDriverAdapter {
      */
     private static Connection openH2Connection(boolean autocommit) throws SQLException {
         System.setProperty("h2.serializeJavaObject", "false");
+        System.setProperty("h2.objectCacheMaxPerElementSize", "0"); // Avoid ValueJavaObject caching.
 
         String dbName = "test";
 
-        Connection conn = DriverManager.getConnection("jdbc:h2:mem:" + dbName + ";DB_CLOSE_DELAY=-1");
+        Connection conn = DriverManager.getConnection("jdbc:h2:mem:" + dbName + DB_OPTIONS);
 
         conn.setAutoCommit(autocommit);
 
@@ -90,9 +119,10 @@ public class H2Benchmark extends BenchmarkDriverAdapter {
     /**
      * Initialize h2 database schema.
      *
+     * @param conn Connection.
      * @throws SQLException If exception.
      */
-    protected static void initializeH2Schema() throws SQLException {
+    protected static void initializeH2Schema(Connection conn) throws SQLException {
         Statement st = conn.createStatement();
 
         st.execute("CREATE SCHEMA \"test\"");
@@ -115,7 +145,7 @@ public class H2Benchmark extends BenchmarkDriverAdapter {
      * @param p Person.
      * @throws SQLException If exception.
      */
-    private static void insertInDb(Person p) throws SQLException {
+    private static void insertInDb(Connection conn, Person p) throws SQLException {
         try(PreparedStatement st = conn.prepareStatement("insert into \"test\".PERSON " +
             "(_key, _val, id, orgId, firstName, lastName, salary) values(?, ?, ?, ?, ?, ?, ?)")) {
             st.setObject(1, p.getId(), Types.JAVA_OBJECT);
@@ -132,13 +162,23 @@ public class H2Benchmark extends BenchmarkDriverAdapter {
 
     /** {@inheritDoc} */
     @Override public boolean test(Map<Object, Object> ctx) throws Exception {
+        Connection conn = (Connection)ctx.get(CONNECTION_KEY);
+
+        if (conn == null) {
+            int num = threadNum.getAndIncrement();
+
+            conn = conns[num];
+
+            ctx.put(CONNECTION_KEY, conn);
+        }
+
         double salary = ThreadLocalRandom.current().nextDouble() * RANGE * 1000;
 
         double maxSalary = salary + 1000;
 
         String qry = "select _key, _val from \"test\".PERSON where salary >= ? and salary <= ?";
 
-        List<List<?>> lists = executeH2Query(qry, salary, maxSalary);
+        List<List<?>> lists = executeH2Query(conn, qry, salary, maxSalary);
 
         for (List<?> list : lists) {
             if (list.size() != 2)
@@ -162,7 +202,7 @@ public class H2Benchmark extends BenchmarkDriverAdapter {
      * @return Result of SQL query on h2 database.
      * @throws SQLException If exception.
      */
-    private List<List<?>> executeH2Query(String sql, Object... args) throws SQLException {
+    private static List<List<?>> executeH2Query(Connection conn, String sql, Object... args) throws SQLException {
         List<List<?>> res = new ArrayList<>();
         ResultSet rs = null;
 
