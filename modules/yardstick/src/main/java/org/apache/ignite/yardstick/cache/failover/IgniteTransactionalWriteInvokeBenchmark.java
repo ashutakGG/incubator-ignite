@@ -64,25 +64,26 @@ public class IgniteTransactionalWriteInvokeBenchmark extends IgniteFailoverAbstr
 
         assert args.keysCount() > 0 : "Count of keys: " + args.keysCount();
 
-        println(cfg, "Populating data...");
+        final String cacheName = cacheName();
+
+        println(cfg, "Populating data for cache: " + cacheName);
 
         long start = System.nanoTime();
 
-        if (cfg.memberId() == 0) {
-            try (IgniteDataStreamer<String, Long> dataLdr = ignite().dataStreamer(cacheName())) {
-                for (int k = 0; k < args.range() && !Thread.currentThread().isInterrupted(); k++) {
-                    dataLdr.addData("key-" + k + "-master", INITIAL_VALUE);
+        try (IgniteDataStreamer<String, Long> dataLdr = ignite().dataStreamer(cacheName())) {
+            for (int k = 0; k < args.range() && !Thread.currentThread().isInterrupted(); k++) {
+                dataLdr.addData("key-" + k + "-master", INITIAL_VALUE);
 
-                    for (int i = 0; i < args.keysCount(); i++)
-                        dataLdr.addData("key-" + k + "-" + i, INITIAL_VALUE);
+                for (int i = 0; i < args.keysCount(); i++)
+                    dataLdr.addData("key-" + k + "-" + i, INITIAL_VALUE);
 
-                    if (k % 100000 == 0)
-                        println(cfg, "Populated accounts: " + k);
-                }
+                if (k % 10000 == 0)
+                    println(cfg, "Populated " + k + " keys in cache " + cacheName);
             }
         }
 
-        println(cfg, "Finished populating data in " + ((System.nanoTime() - start) / 1_000_000) + " ms.");
+        println(cfg, "Finished populating data for cache " + cacheName + " in "
+            + ((System.nanoTime() - start) / 1_000_000) + " ms.");
     }
 
     /** {@inheritDoc} */
