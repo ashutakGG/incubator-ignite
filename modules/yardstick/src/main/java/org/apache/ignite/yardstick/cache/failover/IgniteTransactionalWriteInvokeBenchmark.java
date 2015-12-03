@@ -17,23 +17,19 @@
 
 package org.apache.ignite.yardstick.cache.failover;
 
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.atomic.AtomicLong;
 import javax.cache.processor.EntryProcessorException;
 import javax.cache.processor.MutableEntry;
 import org.apache.ignite.Ignite;
 import org.apache.ignite.IgniteDataStreamer;
 import org.apache.ignite.cache.CacheEntryProcessor;
-import org.apache.ignite.cache.affinity.Affinity;
-import org.apache.ignite.cluster.ClusterNode;
 import org.apache.ignite.internal.IgniteKernal;
-import org.apache.ignite.internal.processors.cache.distributed.dht.GridDhtLocalPartition;
 import org.apache.ignite.internal.util.typedef.F;
 import org.yardstickframework.BenchmarkConfiguration;
 
@@ -55,6 +51,8 @@ import static org.yardstickframework.BenchmarkUtils.println;
  * </ul>
  */
 public class IgniteTransactionalWriteInvokeBenchmark extends IgniteFailoverAbstractBenchmark<String, Long> {
+    private final AtomicLong ctr = new AtomicLong();
+
     /** */
     private static final Long INITIAL_VALUE = 1L;
 
@@ -88,6 +86,8 @@ public class IgniteTransactionalWriteInvokeBenchmark extends IgniteFailoverAbstr
 
     /** {@inheritDoc} */
     @Override public boolean test(Map<Object, Object> ctx) throws Exception {
+        println(">>>>> IgniteTransactionalWriteInvokeBenchmark.test()" + ctr.incrementAndGet());
+
         final int k = nextRandom(args.range());
 
         final String[] keys = new String[args.keysCount()];
@@ -173,42 +173,21 @@ public class IgniteTransactionalWriteInvokeBenchmark extends IgniteFailoverAbstr
         /** {@inheritDoc} */
         @Override public Object process(MutableEntry<String, Long> entry,
             Object... arguments) throws EntryProcessorException {
+            IgniteKernal ignite = (IgniteKernal)entry.unwrap(Ignite.class);
+
+            ignite.log().info(">>>>> invoke at IgniteTransactionalWriteInvokeBenchmark, entryKey=" + entry.getKey()
+                + ", entryVal=" + entry.getValue() + ", node=" + ignite.cluster().localNode().id());
+
             if (entry.getValue() == null) {
                 String cacheName = (String)arguments[0];
 
-                IgniteKernal kernal = (IgniteKernal)entry.unwrap(Ignite.class);
-
-                Affinity<String> aff = kernal.affinity(cacheName);
-
-                final int partIdx = aff.partition(entry.getKey());
-
-                final Collection<ClusterNode> nodes = aff.mapKeyToPrimaryAndBackups(entry.getKey());
-
-                List<GridDhtLocalPartition> locPartitions = kernal.cachex(cacheName).context().topology().
-                    localPartitions();
-
-                GridDhtLocalPartition part = null;
-
-                for (GridDhtLocalPartition p : locPartitions) {
-                    if (p.id() == partIdx) {
-                        part = p;
-
-                        break;
-                    }
-                }
-
-                kernal.log().warning("Found unexpected null-value, debug info:"
+                ignite.log().warning("Found unexpected null-value, debug info:"
                         + "\n    entry=" + entry
                         + "\n    key=" + entry.getKey()
-                        + "\n    locNodeId=" + kernal.cluster().localNode().id()
-                        + "\n    primaryAndBackupsNodes=" + nodes
-                        + "\n    part=" + part
-                        + "\n    partIdx=" + partIdx
-                        + "\n    locParts=" + locPartitions
-                        + "\n    allPartMap=" + kernal.cachex(cacheName).context().topology().partitionMap(true)
+                        + "\n    cache=" + cacheName
                 );
 
-                return new Object(); // non-null value.
+                return 1;
             }
 
             entry.setValue(entry.getValue() + 1);

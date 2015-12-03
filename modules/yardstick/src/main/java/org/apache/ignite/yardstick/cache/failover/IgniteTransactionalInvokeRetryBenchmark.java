@@ -27,7 +27,9 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.cache.processor.EntryProcessorException;
 import javax.cache.processor.MutableEntry;
+import org.apache.ignite.Ignite;
 import org.apache.ignite.cache.CacheEntryProcessor;
+import org.apache.ignite.internal.IgniteKernal;
 import org.apache.ignite.internal.util.typedef.internal.U;
 import org.yardstickframework.BenchmarkConfiguration;
 
@@ -40,6 +42,8 @@ import static org.yardstickframework.BenchmarkUtils.println;
  * to the values in the cache.
  */
 public class IgniteTransactionalInvokeRetryBenchmark extends IgniteFailoverAbstractBenchmark<String, Long> {
+    private final AtomicLong ctr = new AtomicLong();
+
     /** */
     private final ConcurrentMap<String, AtomicLong> map = new ConcurrentHashMap<>();
 
@@ -153,6 +157,8 @@ public class IgniteTransactionalInvokeRetryBenchmark extends IgniteFailoverAbstr
 
     /** {@inheritDoc} */
     @Override public boolean test(Map<Object, Object> ctx) throws Exception {
+        println("IgniteTransactionalInvokeRetryBenchmark.test()" + ctr.incrementAndGet());
+
         final int k = nextRandom(args.range());
 
         final String[] keys = new String[args.keysCount()];
@@ -169,7 +175,7 @@ public class IgniteTransactionalInvokeRetryBenchmark extends IgniteFailoverAbstr
                 if (ex != null)
                     throw ex;
 
-                asyncCache.invoke(key, new IncrementCacheEntryProcessor());
+                asyncCache.invoke(key, new IncrementCacheEntryProcessor(), cacheName());
                 asyncCache.future().get(args.cacheOperationTimeoutMillis());
 
                 AtomicLong prevVal = map.putIfAbsent(key, new AtomicLong(0));
@@ -202,6 +208,10 @@ public class IgniteTransactionalInvokeRetryBenchmark extends IgniteFailoverAbstr
         /** {@inheritDoc} */
         @Override public Long process(MutableEntry<String, Long> entry,
             Object... arguments) throws EntryProcessorException {
+            IgniteKernal ignite = (IgniteKernal)entry.unwrap(Ignite.class);
+
+            ignite.log().info(">>>>> invoke at IgniteTransactionalInvokeRetryBenchmark, node: " + ignite.cluster().localNode().id());
+
             long newVal = entry.getValue() == null ? 0 : entry.getValue() + 1;
 
             entry.setValue(newVal);
