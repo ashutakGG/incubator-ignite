@@ -79,6 +79,9 @@ public class H2CompareBigQueryTest extends AbstractH2CompareQueryTest {
     /** Full the big query. */
     private String bigQry = getBigQry();
 
+    /** */
+    private boolean distributedJoins;
+
     /**
      * Extracts the big query from file.
      *
@@ -101,6 +104,13 @@ public class H2CompareBigQueryTest extends AbstractH2CompareQueryTest {
         }
 
         return res;
+    }
+
+    /**
+     * @return Use colocated data.
+     */
+    private boolean useColocatedData() {
+        return !distributedJoins;
     }
 
     /** {@inheritDoc} */
@@ -162,7 +172,7 @@ public class H2CompareBigQueryTest extends AbstractH2CompareQueryTest {
 
                 add(op);
 
-                pCache.put(op.key(), op);
+                pCache.put(op.key(useColocatedData()), op);
 
                 insertInDb(op);
             }
@@ -176,7 +186,7 @@ public class H2CompareBigQueryTest extends AbstractH2CompareQueryTest {
 
                     add(replace);
 
-                    pCache.put(replace.key(), replace);
+                    pCache.put(replace.key(useColocatedData()), replace);
 
                     insertInDb(replace);
                 }
@@ -191,7 +201,7 @@ public class H2CompareBigQueryTest extends AbstractH2CompareQueryTest {
 
                     add(c);
 
-                    pCache.put(c.key(), c);
+                    pCache.put(c.key(useColocatedData()), c);
 
                     insertInDb(c);
                 }
@@ -247,6 +257,8 @@ public class H2CompareBigQueryTest extends AbstractH2CompareQueryTest {
      * @param distributedJoins Use distributed joins flag.
      */
     public void checkBigQuery(boolean distributedJoins) throws Exception {
+        this.distributedJoins = distributedJoins;
+
         List<List<?>> res = compareQueryRes0(pCache, bigQry, distributedJoins, new Object[0], Ordering.RANDOM);
 
         assertTrue(!res.isEmpty()); // Ensure we set good testing data at database.
@@ -351,7 +363,7 @@ public class H2CompareBigQueryTest extends AbstractH2CompareQueryTest {
                 "values(?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
             int i = 0;
 
-            st.setObject(++i, o.key());
+            st.setObject(++i, o.key(useColocatedData()));
             st.setObject(++i, o);
             st.setObject(++i, o.id);
             st.setObject(++i, o.orderId);
@@ -375,7 +387,7 @@ public class H2CompareBigQueryTest extends AbstractH2CompareQueryTest {
             "insert into \"part\".OrderParams (_key, _val, id, date, orderId, parentAlgo) values(?, ?, ?, ?, ?, ?)")) {
             int i = 0;
 
-            st.setObject(++i, o.key());
+            st.setObject(++i, o.key(useColocatedData()));
             st.setObject(++i, o);
             st.setObject(++i, o.id);
             st.setObject(++i, o.date);
@@ -396,7 +408,7 @@ public class H2CompareBigQueryTest extends AbstractH2CompareQueryTest {
             "insert into \"part\".Cancel (_key, _val, id, date, refOrderId) values(?, ?, ?, ?, ?)")) {
             int i = 0;
 
-            st.setObject(++i, o.key());
+            st.setObject(++i, o.key(useColocatedData()));
             st.setObject(++i, o);
             st.setObject(++i, o.id);
             st.setObject(++i, o.date);
@@ -535,8 +547,8 @@ public class H2CompareBigQueryTest extends AbstractH2CompareQueryTest {
         /**
          * @return Afinity key.
          */
-        public AffinityKey<Integer> key() {
-            return new AffinityKey<>(id, orderId);
+        public Object key(boolean useColocatedData) {
+            return useColocatedData ? new AffinityKey<>(id, orderId) : id;
         }
 
         /** {@inheritDoc} */
@@ -586,7 +598,7 @@ public class H2CompareBigQueryTest extends AbstractH2CompareQueryTest {
         /**
          * @return Afinity key.
          */
-        public AffinityKey<Integer> key() {
+        public AffinityKey<Integer> key(boolean aff) {
             return new AffinityKey<>(id, orderId);
         }
 
@@ -631,8 +643,8 @@ public class H2CompareBigQueryTest extends AbstractH2CompareQueryTest {
         /**
          * @return Afinity key.
          */
-        public AffinityKey<Integer> key() {
-            return new AffinityKey<>(id, refOrderId);
+        public Object key(boolean aff) {
+            return aff ? new AffinityKey<>(id, refOrderId) : id;
         }
 
         /** {@inheritDoc} */
