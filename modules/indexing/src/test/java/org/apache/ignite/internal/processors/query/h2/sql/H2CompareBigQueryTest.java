@@ -122,9 +122,9 @@ public class H2CompareBigQueryTest extends AbstractH2CompareQueryTest {
         if (mode == CacheMode.PARTITIONED)
             cc.setIndexedTypes(
                 Integer.class, CustOrder.class,
-                AffinityKey.class, ReplaceOrder.class,
-                AffinityKey.class, OrderParams.class,
-                AffinityKey.class, Cancel.class
+                useColocatedData() ? AffinityKey.class : Integer.class, ReplaceOrder.class,
+                useColocatedData() ? AffinityKey.class : Integer.class, OrderParams.class,
+                useColocatedData() ? AffinityKey.class : Integer.class, Cancel.class
             );
         else if (mode == CacheMode.REPLICATED)
             cc.setIndexedTypes(
@@ -255,6 +255,8 @@ public class H2CompareBigQueryTest extends AbstractH2CompareQueryTest {
     @Override protected Statement initializeH2Schema() throws SQLException {
         Statement st = super.initializeH2Schema();
 
+        final String keyType = useColocatedData() ? "other" : "int";
+
         st.execute("create table \"part\".CustOrder" +
             "  (" +
             "  _key int not null," +
@@ -269,7 +271,7 @@ public class H2CompareBigQueryTest extends AbstractH2CompareQueryTest {
 
         st.execute("create table \"part\".ReplaceOrder" +
             "  (" +
-            "  _key other not null," +
+            "  _key " + keyType + " not null," +
             "  _val other not null," +
             "  id int unique," +
             "  orderId int ," +
@@ -282,7 +284,7 @@ public class H2CompareBigQueryTest extends AbstractH2CompareQueryTest {
 
         st.execute("create table \"part\".OrderParams" +
             "  (" +
-            "  _key other not null," +
+            "  _key " + keyType + " not null," +
             "  _val other not null," +
             "  id int unique," +
             "  orderId int ," +
@@ -292,7 +294,7 @@ public class H2CompareBigQueryTest extends AbstractH2CompareQueryTest {
 
         st.execute("create table \"part\".Cancel" +
             "  (" +
-            "  _key other not null," +
+            "  _key " + keyType + " not null," +
             "  _val other not null," +
             "  id int unique," +
             "  date Date, " +
@@ -381,7 +383,7 @@ public class H2CompareBigQueryTest extends AbstractH2CompareQueryTest {
             st.setObject(++i, o.orderId);
             st.setObject(++i, o.parentAlgo);
 
-            st.executeUpdate();
+           st.executeUpdate();
         }
     }
 
