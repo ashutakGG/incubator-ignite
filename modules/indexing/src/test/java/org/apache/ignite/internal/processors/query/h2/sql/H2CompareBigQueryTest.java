@@ -79,9 +79,6 @@ public class H2CompareBigQueryTest extends AbstractH2CompareQueryTest {
     /** Full the big query. */
     private String bigQry = getBigQry();
 
-    /** */
-    private boolean distributedJoins;
-
     /**
      * Extracts the big query from file.
      *
@@ -110,7 +107,14 @@ public class H2CompareBigQueryTest extends AbstractH2CompareQueryTest {
      * @return Use colocated data.
      */
     private boolean useColocatedData() {
-        return !distributedJoins;
+        return !distributedJoins();
+    }
+
+    /**
+     * @return Whehter to use distrubutedJoins or not.
+     */
+    protected boolean distributedJoins() {
+        return false;
     }
 
     /** {@inheritDoc} */
@@ -242,24 +246,7 @@ public class H2CompareBigQueryTest extends AbstractH2CompareQueryTest {
      * @throws Exception If failed.
      */
     public void testBigQuery() throws Exception {
-        checkBigQuery(false);
-    }
-
-    /**
-     * @throws Exception If failed.
-     */
-    public void testBigQueryDistributed() throws Exception {
-        checkBigQuery(true);
-    }
-
-    /**
-     * @throws Exception If failed.
-     * @param distributedJoins Use distributed joins flag.
-     */
-    public void checkBigQuery(boolean distributedJoins) throws Exception {
-        this.distributedJoins = distributedJoins;
-
-        List<List<?>> res = compareQueryRes0(pCache, bigQry, distributedJoins, new Object[0], Ordering.RANDOM);
+        List<List<?>> res = compareQueryRes0(pCache, bigQry, distributedJoins(), new Object[0], Ordering.RANDOM);
 
         assertTrue(!res.isEmpty()); // Ensure we set good testing data at database.
     }
@@ -545,7 +532,8 @@ public class H2CompareBigQueryTest extends AbstractH2CompareQueryTest {
         }
 
         /**
-         * @return Afinity key.
+         * @param useColocatedData Use colocated data.
+         * @return Key.
          */
         public Object key(boolean useColocatedData) {
             return useColocatedData ? new AffinityKey<>(id, orderId) : id;
@@ -596,10 +584,11 @@ public class H2CompareBigQueryTest extends AbstractH2CompareQueryTest {
         }
 
         /**
-         * @return Afinity key.
+         * @param useColocatedData Use colocated data.*
+         * @return Key.
          */
-        public AffinityKey<Integer> key(boolean aff) {
-            return new AffinityKey<>(id, orderId);
+        public Object key(boolean useColocatedData) {
+            return useColocatedData ? new AffinityKey<>(id, orderId) : id;
         }
 
         /** {@inheritDoc} */
@@ -630,7 +619,7 @@ public class H2CompareBigQueryTest extends AbstractH2CompareQueryTest {
         private Date date;
 
         /**
-         * @param id
+         * @param id ID.
          * @param refOrderId Reference order id.
          * @param date Date.
          */
@@ -641,10 +630,11 @@ public class H2CompareBigQueryTest extends AbstractH2CompareQueryTest {
         }
 
         /**
-         * @return Afinity key.
+         * @param useColocatedData Use colocated data.
+         * @return Key.
          */
-        public Object key(boolean aff) {
-            return aff ? new AffinityKey<>(id, refOrderId) : id;
+        public Object key(boolean useColocatedData) {
+            return useColocatedData ? new AffinityKey<>(id, refOrderId) : id;
         }
 
         /** {@inheritDoc} */
