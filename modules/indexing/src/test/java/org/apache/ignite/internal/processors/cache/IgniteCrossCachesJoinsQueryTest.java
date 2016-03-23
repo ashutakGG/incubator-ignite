@@ -366,8 +366,7 @@ public class IgniteCrossCachesJoinsQueryTest extends AbstractH2CompareQueryTest 
      */
     private void checkAllCacheCombinationsSet1() throws Exception {
         final Set<TestCacheType> personCacheTypes = new LinkedHashSet<TestCacheType>() {{
-//            add(TestCacheType.REPLICATED_1);
-            add(TestCacheType.PARTITIONED_b1_1);
+            add(TestCacheType.REPLICATED_1);
         }};
 
         final Set<TestCacheType> accCacheTypes = new LinkedHashSet<TestCacheType>() {{
@@ -470,6 +469,7 @@ public class IgniteCrossCachesJoinsQueryTest extends AbstractH2CompareQueryTest 
 
                         errors.put(new TestConfig(cfgIdx, cache, personCacheType, accCacheType, orgCacheType, qry), e);
 
+                        // TODO delete.
                         throw new IllegalStateException(new TestConfig(cfgIdx, cache, personCacheType, accCacheType, orgCacheType, qry).toString(), e);
                     }
 
