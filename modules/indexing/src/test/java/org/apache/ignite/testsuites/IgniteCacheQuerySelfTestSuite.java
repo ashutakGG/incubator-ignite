@@ -51,7 +51,7 @@ import org.apache.ignite.internal.processors.cache.IgniteCacheQueryMultiThreaded
 import org.apache.ignite.internal.processors.cache.IgniteCacheQueryOffheapEvictsMultiThreadedSelfTest;
 import org.apache.ignite.internal.processors.cache.IgniteCacheQueryOffheapMultiThreadedSelfTest;
 import org.apache.ignite.internal.processors.cache.IgniteCacheSqlQueryMultiThreadedSelfTest;
-import org.apache.ignite.internal.processors.cache.IgniteCrossCachesDistributedJoinQueryTest;
+import org.apache.ignite.internal.processors.cache.IgniteCrossCachesJoinsQueryTest;
 import org.apache.ignite.internal.processors.cache.SqlFieldsQuerySelfTest;
 import org.apache.ignite.internal.processors.cache.distributed.near.IgniteCacheAtomicFieldsQuerySelfTest;
 import org.apache.ignite.internal.processors.cache.distributed.near.IgniteCacheAtomicNearEnabledFieldsQuerySelfTest;
@@ -256,7 +256,7 @@ public class IgniteCacheQuerySelfTestSuite extends TestSuite {
         suite.addTestSuite(IgniteCacheNoClassQuerySelfTest.class);
 
         suite.addTestSuite(IgniteCacheJoinQueryTest.class);
-        suite.addTestSuite(IgniteCrossCachesDistributedJoinQueryTest.class);
+        suite.addTestSuite(IgniteCrossCachesJoinsQueryTest.class);
 
         // Other.
         suite.addTestSuite(CacheQueryNewClientSelfTest.class);
