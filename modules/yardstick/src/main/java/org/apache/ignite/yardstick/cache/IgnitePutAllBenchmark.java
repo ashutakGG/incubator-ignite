@@ -45,7 +45,7 @@ public class IgnitePutAllBenchmark extends IgniteCacheAbstractBenchmark<Integer,
 
         ClusterNode node = args.collocated() ? aff.mapKeyToNode(nextRandom(args.range())) : null;
 
-        for (int i = 0; i < args.batch(); ) {
+        for (int i = 0; vals.size() < args.batch(); ) {
             int key = nextRandom(args.range());
 
             if (args.collocated() && !aff.isPrimary(node, key))

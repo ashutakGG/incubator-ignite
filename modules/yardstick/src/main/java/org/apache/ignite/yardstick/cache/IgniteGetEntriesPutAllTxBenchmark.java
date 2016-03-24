@@ -49,7 +49,7 @@ public class IgniteGetEntriesPutAllTxBenchmark extends IgniteCacheAbstractBenchm
             @Override public Void call() throws Exception {
                 SortedMap<Integer, Integer> vals = new TreeMap<>();
 
-                for (int i = 0; i < args.batch(); i++) {
+                for (int i = 0; vals.size() < args.batch(); i++) {
                     int key = r.nextRandom();
 
                     vals.put(key, key);

@@ -48,7 +48,7 @@ public class IgnitePutAllSerializableTxBenchmark extends IgniteCacheAbstractBenc
 
         Map<Integer, Integer> vals = new HashMap<>();
 
-        for (int i = 0; i < args.batch(); i++) {
+        for (int i = 0; vals.size() < args.batch(); i++) {
             int key = r.nextRandom();
 
             vals.put(key, key);

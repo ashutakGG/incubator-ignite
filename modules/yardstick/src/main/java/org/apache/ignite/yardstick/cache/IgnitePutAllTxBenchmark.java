@@ -47,7 +47,7 @@ public class IgnitePutAllTxBenchmark extends IgniteCacheAbstractBenchmark<Intege
 
         ClusterNode node = args.collocated() ? aff.mapKeyToNode(r.nextRandom()) : null;
 
-        for (int i = 0; i < args.batch(); ) {
+        for (int i = 0; vals.size() < args.batch(); ) {
             int key = r.nextRandom();
 
             if (args.collocated() && !aff.isPrimary(node, key))
