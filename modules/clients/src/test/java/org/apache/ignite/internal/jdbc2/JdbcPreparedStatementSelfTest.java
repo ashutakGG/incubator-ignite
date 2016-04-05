@@ -20,6 +20,7 @@ package org.apache.ignite.internal.jdbc2;
 import org.apache.ignite.*;
 import org.apache.ignite.cache.query.annotations.*;
 import org.apache.ignite.configuration.*;
+import org.apache.ignite.internal.binary.BinaryMarshaller;
 import org.apache.ignite.spi.discovery.tcp.*;
 import org.apache.ignite.spi.discovery.tcp.ipfinder.*;
 import org.apache.ignite.spi.discovery.tcp.ipfinder.vm.*;
@@ -41,16 +42,19 @@ import static org.apache.ignite.cache.CacheWriteSynchronizationMode.*;
  */
 public class JdbcPreparedStatementSelfTest extends GridCommonAbstractTest {
     /** IP finder. */
-    private static final TcpDiscoveryIpFinder IP_FINDER = new TcpDiscoveryVmIpFinder(true);
+    static final TcpDiscoveryIpFinder IP_FINDER = new TcpDiscoveryVmIpFinder(true);
 
     /** JDBC URL. */
     private static final String BASE_URL = CFG_URL_PREFIX + "modules/clients/src/test/config/jdbc-config.xml";
 
+    /** */
+    public static final int NODE_CNT = 3;
+
     /** Connection. */
-    private Connection conn;
+    protected Connection conn;
 
     /** Statement. */
-    private PreparedStatement stmt;
+    protected PreparedStatement stmt;
 
     /** {@inheritDoc} */
     @Override protected IgniteConfiguration getConfiguration(String gridName) throws Exception {
@@ -80,7 +84,7 @@ public class JdbcPreparedStatementSelfTest extends GridCommonAbstractTest {
 
     /** {@inheritDoc} */
     @Override protected void beforeTestsStarted() throws Exception {
-        startGridsMultiThreaded(3);
+        startGridsMultiThreaded(NODE_CNT);
 
         IgniteCache<Integer, TestObject> cache = grid(0).cache(null);
 
